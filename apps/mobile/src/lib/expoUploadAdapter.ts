@@ -52,6 +52,12 @@ export class ExpoUploadAdapter implements HttpAdapter {
         httpMethod,
         uploadType: UploadType.BINARY_CONTENT,
         headers: req.headers,
+        // iOS NSURLSession in background mode — chunks already in flight when
+        // the user backgrounds the app continue to complete. Android ignores
+        // this option but its underlying transfer also survives backgrounding
+        // while the process is alive. Default in SDK 56, repeated here for
+        // intent.
+        sessionType: 'background',
       });
 
       const contentType = result.headers['content-type'] ?? result.headers['Content-Type'] ?? '';

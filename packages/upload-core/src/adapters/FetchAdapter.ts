@@ -6,7 +6,14 @@ import type { HttpAdapter, HttpRequest, HttpResponse } from './HttpAdapter.js';
  * React Native, Node 18+).
  */
 export class FetchAdapter implements HttpAdapter {
-  constructor(private readonly fetchImpl: typeof fetch = fetch) {}
+  private readonly fetchImpl: typeof fetch;
+
+  constructor(fetchImpl: typeof fetch = fetch) {
+    // `fetch` requires `globalThis` as its `this`. Storing it as an instance
+    // method and calling `this.fetchImpl(...)` would set the wrong `this` and
+    // browsers throw "Illegal invocation". Bind defensively here.
+    this.fetchImpl = fetchImpl.bind(globalThis);
+  }
 
   async request(req: HttpRequest): Promise<HttpResponse> {
     const response = await this.fetchImpl(req.url, {

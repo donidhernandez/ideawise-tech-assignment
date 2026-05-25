@@ -12,8 +12,11 @@ export class Semaphore {
   private readonly queue: Array<() => void> = [];
   private paused = false;
 
-  constructor(public readonly capacity: number) {
+  readonly capacity: number;
+
+  constructor(capacity: number) {
     if (capacity <= 0) throw new Error('Semaphore capacity must be > 0');
+    this.capacity = capacity;
     this.available = capacity;
   }
 

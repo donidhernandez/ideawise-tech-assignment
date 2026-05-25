@@ -1,4 +1,5 @@
-import { HttpAdapter, HttpError } from './adapters/HttpAdapter.js';
+import type { HttpAdapter } from './adapters/HttpAdapter.js';
+import { HttpError } from './adapters/HttpAdapter.js';
 import { Md5Hasher } from './md5.js';
 import { retryWithBackoff, RetryAbortError } from './retry.js';
 import { Semaphore } from './Semaphore.js';
@@ -31,10 +32,13 @@ interface ChunkState {
 }
 
 export class UploadManager {
-  constructor(
-    private readonly adapter: HttpAdapter,
-    private readonly config: UploadConfig
-  ) {}
+  private readonly adapter: HttpAdapter;
+  private readonly config: UploadConfig;
+
+  constructor(adapter: HttpAdapter, config: UploadConfig) {
+    this.adapter = adapter;
+    this.config = config;
+  }
 
   upload(source: FileSource): UploadHandle {
     return new UploadJob(this.adapter, this.config, source);
@@ -65,11 +69,14 @@ class UploadJob implements UploadHandle {
 
   private fullMd5: string | null = null;
 
-  constructor(
-    private readonly adapter: HttpAdapter,
-    private readonly config: UploadConfig,
-    private readonly source: FileSource
-  ) {
+  private readonly adapter: HttpAdapter;
+  private readonly config: UploadConfig;
+  private readonly source: FileSource;
+
+  constructor(adapter: HttpAdapter, config: UploadConfig, source: FileSource) {
+    this.adapter = adapter;
+    this.config = config;
+    this.source = source;
     this.chunkSize = config.chunkSize ?? DEFAULTS.chunkSize;
     this.concurrency = config.concurrency ?? DEFAULTS.concurrency;
     this.maxRetries = config.maxRetries ?? DEFAULTS.maxRetries;

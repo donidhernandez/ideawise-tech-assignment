@@ -30,7 +30,14 @@ export async function injectFile(page: Page, args: InjectArgs): Promise<void> {
         0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
       ];
       for (let i = 0; i < header.length; i++) buf[i] = header[i]!;
-      for (let i = header.length; i < a.size - 2; i++) buf[i] = (i * a.seed) & 0xff;
+      // Stamp the full seed as 8 unique bytes right after the header. The
+      // `(i * seed) & 0xff` filler alone only produces 256 distinct byte
+      // streams (modulo seed) which collides ~1/256 across test runs;
+      // embedding the full Float64-encoded seed guarantees uniqueness.
+      const seedBuf = new ArrayBuffer(8);
+      new DataView(seedBuf).setFloat64(0, a.seed);
+      buf.set(new Uint8Array(seedBuf), header.length);
+      for (let i = header.length + 8; i < a.size - 2; i++) buf[i] = (i * a.seed) & 0xff;
       buf[a.size - 2] = 0xff;
       buf[a.size - 1] = 0xd9;
     } else {
@@ -51,12 +58,13 @@ export async function injectFile(page: Page, args: InjectArgs): Promise<void> {
 }
 
 /**
- * Convenience: clear persisted history before a test, then reload.
- * The active upload queue is in-memory only, so a reload is enough.
+ * Convenience: clear persisted state before a test, then reload. Drops
+ * both the queue and the history localStorage keys.
  */
 export async function resetStore(page: Page): Promise<void> {
   await page.evaluate(() => {
     try {
+      localStorage.removeItem('media-uploader-queue');
       localStorage.removeItem('media-uploader-history');
     } catch {
       // ignore — some test contexts disable localStorage

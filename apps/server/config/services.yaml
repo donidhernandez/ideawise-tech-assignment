@@ -6,6 +6,8 @@ parameters:
     app.storage_dir: '%kernel.project_dir%/var/storage'
     app.max_upload_size: '%env(int:MAX_UPLOAD_SIZE)%'
     app.chunk_size: '%env(int:CHUNK_SIZE)%'
+    app.chunk_state_backend: '%env(default:default_chunk_state_backend:CHUNK_STATE_BACKEND)%'
+    default_chunk_state_backend: 'filesystem'
 
 services:
     _defaults:
@@ -37,3 +39,22 @@ services:
     App\Command\CleanupUploadsCommand:
         arguments:
             $storageDir: '%app.storage_dir%'
+
+    # Predis client. Only instantiated lazily when CHUNK_STATE_BACKEND=redis;
+    # the constructor accepts a DSN string so this works against a local
+    # redis://localhost:6379 or any production cluster URL.
+    Predis\Client:
+        arguments:
+            $parameters: '%env(default::REDIS_DSN)%'
+        public: false
+
+    Predis\ClientInterface: '@Predis\Client'
+
+    # Bind the ChunkStateRepository interface to whichever concrete the
+    # CHUNK_STATE_BACKEND env var selects. Default: filesystem.
+    App\Service\ChunkStateRepository:
+        factory: ['@App\Service\ChunkStateRepositoryFactory', 'create']
+
+    App\Service\ChunkStateRepositoryFactory:
+        arguments:
+            $backend: '%app.chunk_state_backend%'

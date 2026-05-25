@@ -7,6 +7,7 @@ namespace App\Controller\Api;
 use App\Entity\Upload;
 use App\EventSubscriber\UserIdSubscriber;
 use App\Repository\UploadRepository;
+use App\Service\ChunkStateRepository;
 use App\Service\ChunkStorage;
 use App\Service\MagicNumberValidator;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,6 +23,7 @@ final class UploadChunkController
         private readonly EntityManagerInterface $em,
         private readonly UploadRepository $uploads,
         private readonly ChunkStorage $chunkStorage,
+        private readonly ChunkStateRepository $chunkState,
         private readonly MagicNumberValidator $mimeValidator,
         private readonly LoggerInterface $logger,
         private readonly int $chunkSize,
@@ -106,6 +108,7 @@ final class UploadChunkController
 
         $alreadyExisted = $this->chunkStorage->chunkExists($uuid, $index);
         $this->chunkStorage->writeChunk($uuid, $index, $data);
+        $this->chunkState->addChunk($uuid, $index);
 
         if (!$alreadyExisted) {
             $upload->setReceivedChunks($upload->getReceivedChunks() + 1);

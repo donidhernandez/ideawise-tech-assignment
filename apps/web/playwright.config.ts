@@ -32,14 +32,16 @@ export default defineConfig({
   ],
   webServer: [
     {
-      // Vite dev server. The dev script is hardcoded to :3000 in vite.config.ts.
       command: 'pnpm dev',
       port: 3000,
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
       env: {
         VITE_API_URL: 'http://127.0.0.1:8000',
-        VITE_USER_ID: 'e2e-user',
+        // Fresh user id per Playwright run. X-User-Id keys the rate-limit
+        // bucket, so this keeps the suite's ~12 inits well under the
+        // 10/min ceiling without changing the production limit.
+        VITE_USER_ID: `e2e-${Date.now()}`,
       },
     },
     {
@@ -53,6 +55,12 @@ export default defineConfig({
       port: 8000,
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
+      env: {
+        // E2E may run many sequential inits per user; keep the ceiling
+        // generous. The spec defaults stay intact in dev / prod.
+        RATE_LIMIT_INIT: '1000',
+        RATE_LIMIT_CHUNK: '6000',
+      },
     },
   ],
 });

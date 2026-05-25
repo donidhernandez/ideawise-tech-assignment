@@ -314,3 +314,48 @@ enhancement — copying the picked bytes into OPFS on first pick would
 let the page reload and resume without user interaction. Excluded from
 this PR to keep the scope tight and because OPFS support varies by
 browser engine.
+
+---
+
+## ADR-016: Redis-backed chunk index (opt-in, filesystem default)
+
+**Decision:** Reverses ADR-002 by adding an optional Redis backend for
+the spec's "Track chunk status (Redis records) — Cache uploaded chunks
+(24-hour retention)" requirement, while keeping filesystem as the
+zero-config default.
+
+Selection happens at boot via `CHUNK_STATE_BACKEND` (`filesystem` |
+`redis`), through a `ChunkStateRepositoryFactory` that uses a service
+locator so neither backend is instantiated until the configured one is
+actually selected — `predis/predis` does not attempt a connection when
+running on the filesystem default.
+
+**Shape of the index:**
+- Key:    `upload:{uploadId}:chunks` (configurable prefix for multi-tenant)
+- Value:  Redis SET of stringified chunk indexes (`"0"`, `"1"`, …)
+- TTL:    24 hours, re-armed on every `addChunk()` to match the spec's
+  "cache uploaded chunks (24-hour retention)"
+
+**Why opt-in:**
+- Filesystem is sufficient single-host and keeps the test + dev story
+  one-line.
+- Redis only pays off behind a load balancer: a chunk PUT on host A
+  immediately shows up in a `/status` query routed to host B. ADR-002's
+  original "filesystem is fine for MVP" hasn't changed; this PR adds
+  the production scale path.
+- predis is a soft dependency (autoloaded only when invoked), so the
+  filesystem default doesn't pay the predis tax.
+
+**Where the chunk bytes live:** still on the filesystem (`var/uploads/
+{id}/{i}.part`). The repository is the *index* — "which chunks did I
+receive" — not the data store. In a multi-host deployment with Redis,
+the chunk *bytes* would need to live on shared storage (NFS, S3, …)
+too; that's flagged as a follow-up.
+
+**Tests:**
+- `FilesystemChunkStateRepositoryTest` (5) — full coverage of the
+  default backend against a real tempdir.
+- `RedisChunkStateRepositoryTest` (6) — mocks `Predis\ClientInterface`
+  and asserts the exact Redis commands (sadd / smembers / sismember /
+  del / expire). A live-Redis integration test is deferred behind a
+  `--group=redis-integration` flag.

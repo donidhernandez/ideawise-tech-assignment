@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Repository\UploadRepository;
+use App\Service\ChunkStateRepository;
 use App\Service\ChunkStorage;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -25,6 +26,7 @@ class CleanupUploadsCommand extends Command
         private readonly UploadRepository $uploads,
         private readonly EntityManagerInterface $em,
         private readonly ChunkStorage $chunkStorage,
+        private readonly ChunkStateRepository $chunkState,
         private readonly Filesystem $filesystem,
         private readonly string $storageDir,
     ) {
@@ -56,6 +58,7 @@ class CleanupUploadsCommand extends Command
             $io->writeln(sprintf('  - %s (%s)', $upload->getId()->toRfc4122(), $upload->getCreatedAt()->format('c')));
             if (!$dryRun) {
                 $this->chunkStorage->removeUploadDirectory($upload->getId());
+                $this->chunkState->removeUpload($upload->getId());
                 $this->em->remove($upload);
             }
         }

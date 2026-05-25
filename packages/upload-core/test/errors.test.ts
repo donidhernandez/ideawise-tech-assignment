@@ -62,4 +62,59 @@ describe('categorizeError', () => {
     expect(result.category).toBe('unknown');
     expect(result.message).toBe('something weird');
   });
+
+  it.each([
+    ['missing_chunks', 'server', true],
+    ['assembly_failed', 'server', true],
+    ['invalid_total_chunks', 'server', true],
+    ['chunk_count_mismatch', 'server', true],
+    ['invalid_chunk_size', 'server', true],
+    ['last_chunk_too_large', 'server', true],
+    ['chunk_index_out_of_range', 'server', true],
+    ['invalid_md5', 'server', true],
+    ['invalid_filename', 'server', true],
+    ['invalid_size', 'server', true],
+    ['invalid_upload_id', 'server', true],
+    ['invalid_json', 'server', true],
+    ['upload_not_found', 'server', false],
+    ['empty_chunk', 'integrity', true],
+    ['mime_type_mismatch', 'invalid_type', false],
+    ['chunk_md5_mismatch', 'integrity', true],
+  ])('maps server error code %s to %s (retryable=%s)', (code, category, retryable) => {
+    const err = new HttpError(400, { error: code }, 'failure');
+    const r = categorizeError(err);
+    expect(r.category).toBe(category);
+    expect(r.retryable).toBe(retryable);
+  });
+
+  it.each([
+    [403, 'auth'],
+    [413, 'file_too_large'],
+    [415, 'invalid_type'],
+    [429, 'rate_limited'],
+    [502, 'server'],
+  ])('maps bare HTTP status %d to %s', (status, category) => {
+    const err = new HttpError(status, null, `status ${status}`);
+    expect(categorizeError(err).category).toBe(category);
+  });
+
+  it('maps a 4xx without recognized code to server (non-retryable)', () => {
+    const err = new HttpError(418, { error: 'teapot' }, 'I am a teapot');
+    const r = categorizeError(err);
+    expect(r.category).toBe('server');
+    expect(r.retryable).toBe(false);
+  });
+
+  it('maps a 4xx with no body to server (non-retryable)', () => {
+    const err = new HttpError(400, null, 'bad');
+    const r = categorizeError(err);
+    expect(r.category).toBe('server');
+    expect(r.retryable).toBe(false);
+  });
+
+  it('handles non-Error inputs by stringifying them', () => {
+    const r = categorizeError('a raw string error');
+    expect(r.category).toBe('unknown');
+    expect(r.message).toBe('a raw string error');
+  });
 });

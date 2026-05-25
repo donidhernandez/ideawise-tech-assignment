@@ -14,6 +14,8 @@ node_modules
 
 # Testing
 coverage
+**/coverage/
+apps/server/var/coverage/
 
 # Turbo
 .turbo

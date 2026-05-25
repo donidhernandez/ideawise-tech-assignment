@@ -18,7 +18,7 @@ export function HistoryPanel() {
   }
 
   return (
-    <section className="rounded-xl bg-white ring-1 ring-zinc-200">
+    <section className="min-w-0 overflow-hidden rounded-xl bg-white ring-1 ring-zinc-200">
       <header className="flex items-center justify-between border-b border-zinc-100 px-4 py-3">
         <h2 className="text-sm font-semibold text-zinc-900">
           History · {history.length}
@@ -33,7 +33,7 @@ export function HistoryPanel() {
       </header>
       <ul className="divide-y divide-zinc-100">
         {history.map((h) => (
-          <li key={h.localId} className="flex items-center gap-3 px-4 py-3">
+          <li key={h.localId} className="flex min-w-0 items-center gap-3 px-4 py-3">
             {h.mimeType.startsWith('image/') ? (
               <a href={env.apiUrl + h.url} target="_blank" rel="noreferrer" tabIndex={-1} className="shrink-0">
                 <img
@@ -69,8 +69,8 @@ export function HistoryPanel() {
               >
                 {h.name}
               </a>
-              <p className="mt-0.5 text-xs text-zinc-500">
-                {formatBytes(h.size)} · {formatRelativeTime(h.uploadedAt)}
+              <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-zinc-500">
+                <span className="truncate">{formatBytes(h.size)} · {formatRelativeTime(h.uploadedAt)}</span>
                 {h.deduplicated && (
                   <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
                     deduped

@@ -116,7 +116,7 @@ final class FinalizeUploadController
             ]);
         }
 
-        $storagePath = $this->assembler->moveToStorage($tempPath, $actualMd5, $upload->getFilename());
+        $storagePath = $this->assembler->moveToStorage($tempPath, $actualMd5, $upload->getFilename(), $upload->getUserId());
         $this->chunkStorage->removeUploadDirectory($upload->getId());
 
         $upload->setStatus(Upload::STATUS_COMPLETE);

@@ -1,6 +1,18 @@
 framework:
     rate_limiter:
-        api_upload:
+        # Limits new upload sessions — protects against abuse of /init.
+        # Per spec: "Upload rate limiting (10 requests/minute)".
+        api_upload_init:
             policy: 'sliding_window'
-            limit: 60
+            limit: 10
+            interval: '1 minute'
+
+        # Chunk PUTs are sub-requests of an in-flight upload session, so we
+        # need enough headroom for a single user to push large files
+        # (a 100 MB file at 1 MiB chunks = 100 PUTs). The high cap keeps the
+        # anti-abuse guarantee where it matters (sessions) without breaking
+        # legitimate chunked traffic.
+        api_upload_chunk:
+            policy: 'sliding_window'
+            limit: 600
             interval: '1 minute'

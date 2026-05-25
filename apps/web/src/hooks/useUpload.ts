@@ -1,4 +1,5 @@
 import type { UploadEvent } from '@repo/upload-core';
+import { categorizeError } from '@repo/upload-core';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { fileToSource } from '../lib/fileSource.ts';
@@ -50,6 +51,7 @@ export function useUpload(): {
         ratio: 0,
         url: null,
         error: null,
+        errorCategory: null,
         previewUrl: buildPreview(file),
         deduplicated: false,
       };
@@ -92,16 +94,23 @@ export function useUpload(): {
                 : `${file.name} uploaded`
             );
             break;
-          case 'error':
-            patchItem(localId, { error: event.error.message, status: 'failed' });
-            toast.error(`${file.name}: ${event.error.message}`);
-            break;
-          case 'chunkError':
-            // Surface the most recent transient error inline; not toasted.
+          case 'error': {
+            const cat = categorizeError(event.error);
             patchItem(localId, {
-              error: `chunk ${event.index} attempt ${event.attempt}: ${event.error.message}`,
+              error: cat.message,
+              errorCategory: cat.category,
+              status: 'failed',
             });
+            toast.error(`${file.name}: ${cat.message}`);
             break;
+          }
+          case 'chunkError': {
+            // Surface the most recent transient error inline; not toasted
+            // because the retry loop may still recover.
+            const cat = categorizeError(event.error);
+            patchItem(localId, { error: cat.message, errorCategory: cat.category });
+            break;
+          }
         }
       });
 

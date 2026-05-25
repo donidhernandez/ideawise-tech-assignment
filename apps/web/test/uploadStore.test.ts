@@ -27,6 +27,7 @@ function makeItem(localId: string): UploadItem {
     ratio: 0,
     url: null,
     error: null,
+    errorCategory: null,
     previewUrl: null,
     deduplicated: false,
   };

@@ -1,3 +1,4 @@
+import type { ErrorCategory } from '@repo/upload-core';
 import { Image } from 'expo-image';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -7,6 +8,17 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useUpload } from '@/hooks/use-upload';
 import type { UploadItem as UploadItemModel } from '@/store/uploadStore';
+
+const ERROR_CATEGORY_LABEL: Record<ErrorCategory, string> = {
+  invalid_type: 'INVALID TYPE',
+  file_too_large: 'TOO LARGE',
+  network: 'NETWORK',
+  rate_limited: 'RATE LIMIT',
+  integrity: 'CORRUPT',
+  auth: 'AUTH',
+  server: 'SERVER',
+  unknown: 'ERROR',
+};
 
 interface Props {
   item: UploadItemModel;
@@ -78,7 +90,14 @@ export function UploadItemCard({ item }: Props) {
           </View>
 
           {item.error && item.status === 'failed' && (
-            <ThemedText type="small" style={styles.error}>{item.error}</ThemedText>
+            <View style={styles.errorBox}>
+              {item.errorCategory && (
+                <ThemedText type="smallBold" style={styles.errorCategory}>
+                  {ERROR_CATEGORY_LABEL[item.errorCategory]}
+                </ThemedText>
+              )}
+              <ThemedText type="small" style={styles.error}>{item.error}</ThemedText>
+            </View>
           )}
         </View>
       </View>
@@ -164,7 +183,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3 },
-  error: { color: '#ef4444' },
+  errorBox: {
+    marginTop: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    borderRadius: Spacing.one,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    gap: 2,
+  },
+  errorCategory: { color: '#b91c1c', letterSpacing: 1 },
+  error: { color: '#b91c1c' },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',

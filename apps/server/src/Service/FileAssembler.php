@@ -64,13 +64,19 @@ class FileAssembler
 
     /**
      * Moves an assembled file to its final storage location:
-     * var/storage/{YYYY/MM/DD}/{md5}_{sanitizedFilename}
+     * var/storage/{userId}/{YYYY/MM/DD}/{md5}_{sanitizedFilename}
+     *
+     * Layout is per-user as the spec asks ("organized by date/user"). Dedup
+     * stays cross-user — the path returned here is the *new* upload's path,
+     * but the caller is free to point a deduplicated upload at someone else's
+     * existing path instead of calling this method.
      */
-    public function moveToStorage(string $tempPath, string $md5, string $filename): string
+    public function moveToStorage(string $tempPath, string $md5, string $filename, string $userId): string
     {
         $now = new \DateTimeImmutable();
-        $relativeDir = $now->format('Y/m/d');
-        $absoluteDir = $this->storageDir.DIRECTORY_SEPARATOR.$relativeDir;
+        $safeUser = $this->sanitizeUserId($userId);
+        $relativeDir = $safeUser.'/'.$now->format('Y/m/d');
+        $absoluteDir = $this->storageDir.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
         $this->filesystem->mkdir($absoluteDir, 0775);
 
         $safeName = $this->sanitizeFilename($filename);
@@ -88,5 +94,13 @@ class FileAssembler
         $sanitized = preg_replace('/[^A-Za-z0-9._-]/', '_', $basename) ?? 'file';
 
         return mb_substr($sanitized, 0, 100);
+    }
+
+    private function sanitizeUserId(string $userId): string
+    {
+        $sanitized = preg_replace('/[^A-Za-z0-9_-]/', '_', $userId) ?? 'unknown';
+        $sanitized = mb_substr($sanitized, 0, 64);
+
+        return $sanitized === '' ? 'unknown' : $sanitized;
     }
 }

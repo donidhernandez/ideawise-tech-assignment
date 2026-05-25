@@ -60,16 +60,16 @@ class FileAssemblerTest extends TestCase
         $this->assembler->assemble($upload);
     }
 
-    public function testMoveToStorageOrganizesByDateAndPrefixesMd5(): void
+    public function testMoveToStorageOrganizesByUserAndDate(): void
     {
         $tempFile = $this->tmpRoot.'/tempfile.bin';
         file_put_contents($tempFile, 'data');
 
         $md5 = md5('data');
-        $relative = $this->assembler->moveToStorage($tempFile, $md5, 'My Photo.jpg');
+        $relative = $this->assembler->moveToStorage($tempFile, $md5, 'My Photo.jpg', 'alice-42');
 
         $now = new \DateTimeImmutable();
-        $expectedDir = $now->format('Y/m/d');
+        $expectedDir = 'alice-42/'.$now->format('Y/m/d');
         self::assertStringStartsWith($expectedDir.'/'.$md5.'_', $relative);
         self::assertStringEndsWith('.jpg', $relative);
         self::assertFileExists($this->tmpRoot.'/storage/'.$relative);
@@ -80,9 +80,22 @@ class FileAssemblerTest extends TestCase
     {
         $tempFile = $this->tmpRoot.'/tempfile2.bin';
         file_put_contents($tempFile, 'x');
-        $relative = $this->assembler->moveToStorage($tempFile, md5('x'), '../../etc/passwd');
+        $relative = $this->assembler->moveToStorage($tempFile, md5('x'), '../../etc/passwd', 'user-1');
 
         self::assertStringNotContainsString('..', basename($relative));
         self::assertStringNotContainsString('/', basename($relative));
+    }
+
+    public function testSanitizesUserIdInPath(): void
+    {
+        $tempFile = $this->tmpRoot.'/tempfile3.bin';
+        file_put_contents($tempFile, 'x');
+        $relative = $this->assembler->moveToStorage($tempFile, md5('x'), 'f.jpg', '../../malicious user@evil');
+
+        // First path segment is the sanitized user id — no slashes, dots collapsed.
+        $firstSegment = explode('/', $relative)[0];
+        self::assertStringNotContainsString('..', $firstSegment);
+        self::assertStringNotContainsString('@', $firstSegment);
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]+$/', $firstSegment);
     }
 }

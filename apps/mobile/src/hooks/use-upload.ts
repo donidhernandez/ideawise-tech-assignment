@@ -1,4 +1,5 @@
 import type { UploadEvent } from '@repo/upload-core';
+import { categorizeError } from '@repo/upload-core';
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { assetToSource } from '@/lib/expoFileSource';
@@ -68,6 +69,7 @@ export function useUpload(): {
         ratio: 0,
         url: null,
         error: null,
+        errorCategory: null,
         deduplicated: false,
       };
 
@@ -92,9 +94,15 @@ export function useUpload(): {
               deduplicated: event.result.deduplicated,
             });
             break;
-          case 'error':
-            patchItem(localId, { error: event.error.message, status: 'failed' });
+          case 'error': {
+            const cat = categorizeError(event.error);
+            patchItem(localId, {
+              error: cat.message,
+              errorCategory: cat.category,
+              status: 'failed',
+            });
             break;
+          }
         }
       });
 

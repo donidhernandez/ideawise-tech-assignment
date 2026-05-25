@@ -45,7 +45,7 @@ jobs:
       - name: Test + coverage
         run: pnpm --filter @repo/upload-core coverage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-upload-core
@@ -81,14 +81,14 @@ jobs:
       - name: Production build
         run: pnpm --filter web build
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-web
           path: apps/web/coverage/
           retention-days: 14
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: success()
         with:
           name: web-build
@@ -121,7 +121,7 @@ jobs:
       - name: Test + coverage
         run: pnpm --filter mobile coverage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-mobile
@@ -167,7 +167,7 @@ jobs:
         working-directory: apps/server
         run: vendor/bin/phpunit --testdox --coverage-text --coverage-html=var/coverage
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-backend
@@ -229,7 +229,7 @@ jobs:
         env:
           CI: 'true'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report

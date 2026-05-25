@@ -17,6 +17,8 @@ function makeItem(overrides: Partial<UploadItem>): UploadItem {
     previewUrl: 'blob:something',
     deduplicated: false,
     orphaned: false,
+    retryInfo: null,
+    speedBps: null,
     ...overrides,
   };
 }

@@ -10,9 +10,11 @@
     "test": "turbo run test",
     "coverage": "turbo run coverage",
     "e2e": "pnpm --filter web e2e",
-    "e2e:install": "pnpm --filter web e2e:install"
+    "e2e:install": "pnpm --filter web e2e:install",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "husky": "^9.1.7",
     "prettier": "^3.7.4",
     "turbo": "^2.9.14",
     "typescript": "5.9.2"

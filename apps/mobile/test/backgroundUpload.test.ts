@@ -66,6 +66,7 @@ function makeItem(overrides: Partial<UploadItem>): UploadItem {
     error: null,
     errorCategory: null,
     deduplicated: false,
+    retryInfo: null,
     ...overrides,
   };
 }

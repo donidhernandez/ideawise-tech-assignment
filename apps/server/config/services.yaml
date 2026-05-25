@@ -36,6 +36,11 @@ services:
         arguments:
             $storageDir: '%app.storage_dir%'
 
+    App\Controller\Api\ServeUploadController:
+        arguments:
+            $storageDir: '%app.storage_dir%'
+        tags: ['controller.service_arguments']
+
     App\Command\CleanupUploadsCommand:
         arguments:
             $storageDir: '%app.storage_dir%'

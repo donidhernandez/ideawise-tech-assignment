@@ -92,7 +92,24 @@ class UploadFlowTest extends WebTestCase
         self::assertFalse($finalize['deduplicated']);
         self::assertStringStartsWith('/uploads/', $finalize['url']);
 
-        // 6) finalize same MD5 again from a different upload → deduplicated
+        // 6) serve the uploaded file via GET /uploads/…
+        $this->client->request('GET', $finalize['url']);
+        self::assertResponseIsSuccessful();
+        // BinaryFileResponse streams the body; Content-Length reveals the size
+        self::assertSame(
+            (string) strlen($payload),
+            $this->client->getResponse()->headers->get('Content-Length')
+        );
+        self::assertStringContainsString(
+            'image/',
+            (string) $this->client->getResponse()->headers->get('Content-Type')
+        );
+
+        // 7) path traversal attempt must be rejected
+        $this->client->request('GET', '/uploads/../var/data_test.db');
+        self::assertResponseStatusCodeSame(404);
+
+        // 9) finalize same MD5 again from a different upload → deduplicated
         $this->client->request('POST', '/api/uploads/init', [], [], [
             'CONTENT_TYPE' => 'application/json',
             'HTTP_X-User-Id' => 'user-1',

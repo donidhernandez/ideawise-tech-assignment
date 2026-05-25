@@ -58,24 +58,34 @@ sniffs MIME by magic number on chunk 0, reassembles on finalize, verifies
 MD5, deduplicates against existing files, and commits to date-partitioned
 storage.
 
-Full flow + protocol in [`docs/api.md`](docs/api.md). Design decisions
-(why SQLite, why filesystem over Redis, why no real auth in MVP) in
-[`docs/decisions.md`](docs/decisions.md).
+Full flow + protocol in [`docs/api.md`](docs/api.md). All 16 design
+decisions (storage layout, auth strategy, opt-in Redis, mobile
+background, error categorization, …) in [`docs/decisions.md`](docs/decisions.md).
 
 ---
 
 ## Branches
 
 ```
-main              ← clean baseline: monorepo config + packages/upload-core + docs
-└─ dev            ← integration: all three tiers merged + tested together
-   ├─ feature/backend   apps/server  (Symfony 6.4 API)
-   ├─ feature/web       apps/web     (React 19 + Vite 8 SPA)
-   └─ feature/mobile    apps/mobile  (Expo SDK 56 native app)
+main              clean baseline: monorepo config + packages/upload-core + docs
+└─ dev            integration: every feature merged --no-ff (172+ tests green)
+   ├─ feature/backend                  apps/server (Symfony 6.4 API)
+   ├─ feature/web                      apps/web    (React 19 + Vite 8 SPA)
+   ├─ feature/mobile                   apps/mobile (Expo SDK 56 native app)
+   ├─ feature/quick-wins               rate limit / audit logs / log retention / storage-by-user
+   ├─ feature/background-upload        mobile background via TaskManager + AsyncStorage
+   ├─ feature/mobile-tests             jest-expo suite (36 tests)
+   ├─ feature/test-coverage            Vitest v8 + Jest --coverage + thresholds
+   ├─ feature/e2e-playwright           web E2E happy paths (4 tests)
+   ├─ feature/network-resilience-tests Playwright route() failure injection (4 tests)
+   ├─ feature/web-resumable            web persisted queue + re-pick resume
+   └─ feature/redis-chunks             opt-in Redis ChunkStateRepository
 ```
 
-The brief required each tier on its own branch. They were integrated on
-`dev` with `--no-ff` merges so each feature's history is preserved.
+The brief required each tier on its own branch. Cross-cutting work
+(quick wins, background upload, coverage, E2E, resumable, Redis) lives
+in additional short-lived branches that merge into `dev` with
+`--no-ff` so the feature history stays auditable.
 
 ---
 
@@ -106,9 +116,11 @@ ideawise-tech-assignment/
 ### Prerequisites
 
 - Node 18+ and pnpm 9
-- PHP 8.2+ and Composer 2 (for the backend)
+- PHP 8.2+ (tested on 8.5) and Composer 2 (for the backend)
 - Optional: Symfony CLI for nicer dev DX
 - For mobile: Expo Go on a device or an iOS / Android simulator
+- For Playwright E2E (web only): one-time `pnpm e2e:install` downloads Chromium (~112 MB)
+- For PHP coverage (optional): Xdebug or PCOV — see `apps/server/README.md`
 
 ### 1) Backend (`apps/server`)
 

@@ -45,11 +45,24 @@ pnpm --filter mobile web            # browser preview (UI sanity check only — 
 
 Scan the QR with Expo Go (iOS / Android) for the fastest path.
 
-## Type-check
+## Type-check and tests
 
 ```bash
 pnpm --filter mobile exec tsc --noEmit
+pnpm --filter mobile test                  # Jest (36 tests)
+pnpm --filter mobile coverage              # 95/96/96/94 (stmt/branch/func/line)
 ```
+
+The Jest suite uses `jest-expo` and covers `uploadStore` (rehydrate as
+orphans, replaceItem), the pure helpers in `src/lib/inference.ts`
+(makeLocalId / inferMime / deriveName), `src/lib/env.ts` (defaults +
+overrides + trailing-slash handling), and the full
+`backgroundUpload.ts` flow (`resumePendingUploads` + the event bridge +
+`defineBackgroundUploadTask` + `registerBackgroundUploadTask`).
+Native-only modules (`expo-file-system` `File`/`FileHandle`,
+`expo-task-manager`, `expo-background-task`,
+`@react-native-async-storage/async-storage`) are mocked in
+[`jest.setup.js`](jest.setup.js).
 
 ## Features
 
@@ -60,7 +73,12 @@ pnpm --filter mobile exec tsc --noEmit
 - **Live progress** per file: status badge + percentage + colored bar
   (purple = uploading, amber = paused, emerald = complete, red = failed)
 - **Pause / Resume / Cancel** per file
+- **Categorized errors** (`INVALID TYPE` / `TOO LARGE` / `NETWORK` /
+  `RATE LIMIT` / `CORRUPT` / `AUTH` / `SERVER`) via the shared
+  `categorizeError()` helper in upload-core
 - **Deduplicated** badge when the server short-circuits on MD5 match
+- **Background upload** + **persisted queue** + **auto-resume on
+  foreground / OS wake-up** — see the dedicated section below
 - **Global queue progress** with completed / active counts
 - Native tabs (Upload / Explore) — Upload is the default tab
 
@@ -106,6 +124,12 @@ src/
 ├── store/
 │   └── uploadStore.ts           ← Zustand store + AsyncStorage persist
 └── global.d.ts                  ← CSS module declarations for web bundle
+
+test/                            ← Jest (36 tests / 4 files)
+├── inference.test.ts            (11) — makeLocalId / inferMime / deriveName
+├── env.test.ts                  (3)  — defaults + per-var overrides + slash
+├── uploadStore.test.ts          (6)  — add/patch/remove/rehydrateAsOrphans
+└── backgroundUpload.test.ts     (16) — resume + event bridge + task wiring
 ```
 
 ## Background upload

@@ -27,7 +27,7 @@ symfony serve                                 # http://localhost:8000
 php bin/phpunit --testdox
 ```
 
-Expected: **23 tests, 54 assertions, all green.**
+Expected: **34 tests, 80 assertions, all green.**
 
 The test suite drops and recreates the SQLite test database (`var/data_test.db`)
 on every run, so it is fully deterministic.
@@ -51,7 +51,7 @@ PCOV is the lightweight option (no debug overhead, ~1s on this suite):
 - **macOS / Linux:** `pecl install pcov` then enable in `php.ini`.
 
 If neither is installed the script still runs but PHPUnit prints
-"No code coverage driver available" and reports nothing. The 23 tests
+"No code coverage driver available" and reports nothing. The 34 tests
 themselves are unaffected.
 
 ## Routes
@@ -78,12 +78,34 @@ php bin/console app:uploads:cleanup --dry-run # preview
 
 ## Architecture
 
-- `src/Controller/Api/*` — 4 thin controllers
-- `src/Service/` — `ChunkStorage`, `MagicNumberValidator`, `FileAssembler`, `DedupService`
-- `src/EventSubscriber/` — `UserIdSubscriber` (auth), `RateLimitSubscriber` (60/min)
+- `src/Controller/Api/*` — 4 thin controllers (init / chunk / finalize / status)
+- `src/Service/`
+  - `ChunkStorage`, `MagicNumberValidator`, `FileAssembler`, `DedupService`
+  - **`ChunkStateRepository`** interface +
+    `FilesystemChunkStateRepository` (default) +
+    `RedisChunkStateRepository` (opt-in via `CHUNK_STATE_BACKEND=redis`,
+    24-hour TTL — ADR-016)
+- `src/EventSubscriber/`
+  - `UserIdSubscriber` — X-User-Id auth (ADR-003)
+  - `RateLimitSubscriber` — two buckets: 10/min on `/init`, 600/min on
+    chunks (ADR-010, env-overridable)
+  - `AuditLogSubscriber` — one INFO log per request with
+    `{method, path, status, ip, ua, userId, durationMs}`
 - `src/Command/CleanupUploadsCommand.php` — cron-friendly cleanup
 - `src/Entity/Upload.php` — Doctrine entity
 - `tests/Service/` — pure unit tests (no Kernel)
 - `tests/Controller/` — `WebTestCase`-based functional tests
 
-See [`docs/decisions.md`](../../docs/decisions.md) for ADRs.
+## Configuration knobs
+
+Beyond the defaults in `.env`, three env vars steer runtime behavior:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `RATE_LIMIT_INIT` | `10` | per-minute /init quota per X-User-Id |
+| `RATE_LIMIT_CHUNK` | `600` | per-minute chunk/finalize/status quota per X-User-Id |
+| `CHUNK_STATE_BACKEND` | `filesystem` | `filesystem` (default) or `redis` |
+| `REDIS_DSN` | unset | required when `CHUNK_STATE_BACKEND=redis` |
+
+See [`docs/decisions.md`](../../docs/decisions.md) for the 16 ADRs that
+explain every non-obvious decision.

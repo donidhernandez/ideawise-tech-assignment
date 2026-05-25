@@ -12,6 +12,20 @@ dist
 dist-ssr
 *.local
 
+# Vite + tsc
+.vite
+*.tsbuildinfo
+
+# Vitest coverage (handled by root too but explicit here for safety)
+coverage/
+
+# Playwright artifacts
+test-results/
+playwright-report/
+.playwright/
+blob-report/
+.cache/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

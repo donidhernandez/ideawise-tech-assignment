@@ -100,21 +100,47 @@ src/
 ├── lib/
 │   ├── env.ts                   ← EXPO_PUBLIC_* env reader
 │   ├── manager.ts               ← UploadManager singleton
-│   └── expoFileSource.ts        ← File → upload-core FileSource adapter
+│   ├── expoFileSource.ts        ← File → upload-core FileSource adapter
+│   ├── expoUploadAdapter.ts     ← native binary upload via File.upload()
+│   └── backgroundUpload.ts      ← TaskManager + resume-on-foreground
 ├── store/
-│   └── uploadStore.ts           ← Zustand store of live uploads
+│   └── uploadStore.ts           ← Zustand store + AsyncStorage persist
 └── global.d.ts                  ← CSS module declarations for web bundle
 ```
 
+## Background upload
+
+Three layers cooperate (see [ADR-013](../../docs/decisions.md)):
+
+1. **In-flight chunks** run through `File.upload(..., { sessionType:
+   'background' })` so iOS hands them to a background `NSURLSession`
+   and Android keeps them alive while the process is alive.
+2. **The queue is persisted** to AsyncStorage (`mobile-upload-queue`).
+   On rehydrate, in-flight rows are demoted to `paused` because their
+   `UploadHandle` is gone.
+3. **Resume** runs on (a) initial mount, (b) every app-foreground
+   transition (`AppState` listener), and (c) an OS-scheduled
+   `expo-background-task` (`com.expo.modules.backgroundtask.processing`).
+   All three call the same `resumePendingUploads()` helper, which
+   re-uploads each paused row using the original `sourceUri`. The
+   server's MD5 dedup short-circuits anything that already completed.
+
+**Known limits**
+- `expo-background-task` only fires reliably in a **dev client or
+  production build**, not in Expo Go. In Expo Go the OS-scheduled
+  trigger silently no-ops and only the foreground trigger runs.
+- iOS `BGTaskScheduler` is at the OS's discretion — the 15-minute
+  minimum in our `registerTaskAsync()` call is a hint.
+- The original file URI must still resolve when resume fires. If the
+  OS purged the cache or the user deleted the asset, that row is
+  marked failed with "Source file is no longer available."
+
 ## Out of scope (documented in [`docs/decisions.md`](../../docs/decisions.md))
 
-- **Background upload** — `BGTaskScheduler` (iOS) and `WorkManager`
-  (Android) add significant OS-specific complexity. Documented as a
-  known limitation; the UI stays paused if the user backgrounds the
-  app during an upload.
-- **Persisting the upload queue across app restarts** — the in-memory
-  Zustand store is session-only on mobile. Could be added by mirroring
-  the web app's `persist` middleware over AsyncStorage.
+- **True byte-range resume** — current resume re-uploads from chunk 0
+  and relies on MD5 dedup. Real byte-range resume would require backend
+  `/init` to accept an existing `uploadId` and return populated
+  `existingChunks`. ADR-013 covers the trade-off.
 - **History panel** — present on web; omitted here to keep the mobile
-  screen focused on the active queue. The list could be re-introduced
-  if needed.
+  screen focused on the active queue. The Zustand store could expose
+  it trivially.

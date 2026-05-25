@@ -196,3 +196,46 @@ without rewriting upload-core's chunk-driven flow.
 interrupt the native upload; the next chunk slot will see the abort and
 stop dispatching. For the MVP this is acceptable — pause/resume between
 chunks is the user-facing guarantee, not mid-chunk.
+
+---
+
+## ADR-013: Mobile background upload — `sessionType: 'background'` + TaskManager + persisted queue
+
+**Decision:** Background upload support is a layered concession to OS
+realities rather than a single switch:
+
+1. **In-flight chunks survive backgrounding** because the underlying
+   `File.upload(...)` call passes `sessionType: 'background'` (the SDK 56
+   default). On iOS this hands the transfer to a background
+   `NSURLSession`; on Android the in-process upload also survives a
+   home-button press while the process is alive.
+
+2. **Queue state survives app termination** via Zustand's `persist`
+   middleware backed by AsyncStorage (`mobile-upload-queue`). On
+   rehydrate, any item that was "in flight" the last time the app ran is
+   demoted to `paused` because its in-memory `UploadHandle` is gone.
+
+3. **Resume happens on three triggers:** initial mount, app foreground
+   (via `AppState.addEventListener('change')`), and an OS-scheduled
+   `BackgroundTask` registered with `expo-background-task`. All three
+   call the same `resumePendingUploads()` helper, which re-issues each
+   paused upload with the original `sourceUri`. The server's MD5 dedup
+   short-circuits anything that already finalized in the previous
+   session.
+
+**Why not a true byte-range resume:** Restarting the upload from chunk 0
+with dedup is functionally equivalent to "resume from byte N" for the
+end user when the file already exists on the server; it costs one
+init+finalize round trip if it doesn't. Implementing real byte-range
+resume would require the backend's `/init` to accept an existing
+`uploadId` and return `existingChunks` populated from the filesystem —
+small change, deferred until the assessment proves we need it.
+
+**Known limits (documented in apps/mobile/README.md):**
+- iOS `BGTaskScheduler` is OS-discretionary. The 15-minute "minimum"
+  in our `registerTaskAsync` call is a hint, not a guarantee.
+- `expo-background-task` only fires reliably in a dev client or
+  production build. In Expo Go the registration silently no-ops.
+- Android transfers can survive backgrounding but are killed if the OS
+  reclaims the process. WorkManager-backed continuation would require
+  a custom native module beyond the v56 surface.

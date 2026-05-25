@@ -44,7 +44,9 @@ final class ServeUploadController
         $storageRoot = realpath($this->storageDir);
 
         if ($storageRoot === false) {
-            throw new NotFoundHttpException('Storage directory not configured.');
+            // Storage dir hasn't been created yet (no files finalized, or dir was removed).
+            // From the client's perspective the file simply does not exist.
+            throw new NotFoundHttpException('File not found.');
         }
 
         $absolute = $storageRoot . DIRECTORY_SEPARATOR . $relative;

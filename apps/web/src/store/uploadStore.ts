@@ -1,4 +1,4 @@
-import type { UploadHandle, UploadStatus } from '@repo/upload-core';
+import type { ErrorCategory, UploadHandle, UploadStatus } from '@repo/upload-core';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -16,8 +16,10 @@ export interface UploadItem {
   ratio: number;
   /** Server URL of the finalized file; set on complete. */
   url: string | null;
-  /** Error message if status === 'failed'. */
+  /** User-facing error message if status === 'failed'. */
   error: string | null;
+  /** Coarse error bucket for the UI (icon / tone / retry button). */
+  errorCategory: ErrorCategory | null;
   /** Object URL for image preview thumbnails; revoked on remove. */
   previewUrl: string | null;
   /** Was this upload deduplicated by the server? */

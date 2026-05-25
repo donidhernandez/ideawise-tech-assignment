@@ -1,8 +1,24 @@
+import type { ErrorCategory } from '@repo/upload-core';
 import { useUpload } from '../hooks/useUpload.ts';
 import { formatBytes } from '../lib/format.ts';
 import type { UploadItem as UploadItemModel } from '../store/uploadStore.ts';
 import { FilePreview } from './FilePreview.tsx';
 import { StatusBadge } from './StatusBadge.tsx';
+
+const CATEGORY_LABELS: Record<ErrorCategory, string> = {
+  invalid_type: 'Invalid type',
+  file_too_large: 'Too large',
+  network: 'Network',
+  rate_limited: 'Rate limit',
+  integrity: 'Corrupt',
+  auth: 'Auth',
+  server: 'Server',
+  unknown: 'Error',
+};
+
+function errorCategoryLabel(c: ErrorCategory): string {
+  return CATEGORY_LABELS[c];
+}
 
 interface Props {
   item: UploadItemModel;
@@ -54,7 +70,17 @@ export function UploadItem({ item }: Props) {
           </div>
 
           {item.error && item.status === 'failed' && (
-            <p className="mt-2 text-xs text-rose-600" data-testid="upload-error">{item.error}</p>
+            <div
+              className="mt-2 flex items-start gap-1.5 rounded-md bg-rose-50 px-2 py-1.5 text-xs text-rose-700 ring-1 ring-rose-200"
+              data-testid="upload-error"
+            >
+              {item.errorCategory && (
+                <span className="font-semibold uppercase tracking-wider">
+                  {errorCategoryLabel(item.errorCategory)}
+                </span>
+              )}
+              <span className="flex-1">{item.error}</span>
+            </div>
           )}
 
           {item.url && (

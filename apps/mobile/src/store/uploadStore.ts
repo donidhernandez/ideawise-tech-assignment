@@ -1,4 +1,4 @@
-import type { UploadHandle, UploadStatus } from '@repo/upload-core';
+import type { ErrorCategory, UploadHandle, UploadStatus } from '@repo/upload-core';
 import { create } from 'zustand';
 
 export interface UploadItem {
@@ -13,7 +13,10 @@ export interface UploadItem {
   uploadedBytes: number;
   ratio: number;
   url: string | null;
+  /** User-facing error message if status === 'failed'. */
   error: string | null;
+  /** Coarse error bucket for the UI. */
+  errorCategory: ErrorCategory | null;
   deduplicated: boolean;
 }
 

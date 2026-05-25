@@ -115,16 +115,84 @@ differences would force unnecessary porting if the client environment is older.
 
 ---
 
-## ADR-009: Storage layout — `var/storage/{YYYY/MM/DD}/{md5}_{filename}`
+## ADR-009: Storage layout — `var/storage/{userId}/{YYYY/MM/DD}/{md5}_{filename}`
 
-**Decision:** Final files are stored under date-partitioned directories with
-the MD5 prefixed to the filename.
+**Decision:** Final files are stored under per-user, date-partitioned
+directories with the MD5 prefixed to the filename.
 
 **Why:**
 
-1. Date partitioning keeps any single directory small (avoiding filesystem
-   degradation on millions of files).
-2. The MD5 prefix makes deduplication trivial — two uploads with the same
-   bytes literally point to the same file path; we don't even need symlinks.
-3. The original filename is preserved (sanitized) so HTTP downloads carry a
+1. The spec explicitly asks for storage "organized by date/user" — the path
+   structure satisfies the literal requirement and makes it trivial to list
+   one user's uploads from disk if the DB is unavailable.
+2. Date partitioning keeps any single directory small.
+3. The MD5 prefix makes per-user deduplication trivial.
+4. The original filename is preserved (sanitized) so HTTP downloads carry a
    meaningful `Content-Disposition`.
+
+**Cross-user dedup:** still works at the DB level. When an upload finalizes
+with an MD5 that already exists for *any* user, the new DB row points to the
+original file's `storagePath` rather than writing a second copy. The path
+prefix in that case is the *original* uploader's user id; from the API's
+standpoint this is invisible (each user only ever sees URLs the server
+hands back to them).
+
+---
+
+## ADR-010: Rate limiter split into two buckets (10/min init, 600/min chunk)
+
+**Decision:** Two rate-limiter buckets keyed off `X-User-Id`:
+- `api_upload_init`: 10 requests/minute (matches the literal spec)
+- `api_upload_chunk`: 600 requests/minute (everything else under `/api/`)
+
+**Why:** A single global `10 requests/minute` bucket would make any upload
+of more than ~7 MiB impossible (a 7 MiB file at 1 MiB chunks plus `init` +
+`finalize` + a status check already exceeds 10). The spec's "upload rate
+limiting" is clearly aimed at session creation (preventing abuse of
+`/init`) rather than the chunk traffic *inside* an authorized session.
+Splitting the buckets honors both intents.
+
+**Trade-off:** A misbehaving client can still exhaust the chunk quota
+(600/min ≈ 10 chunks/second per user). For the MVP that's acceptable.
+Production-grade hardening would add a per-IP bucket and a sliding-window
+size limit (e.g. bytes/minute).
+
+---
+
+## ADR-011: Error categorization shared between web and mobile
+
+**Decision:** `@repo/upload-core` ships a `categorizeError(err)` helper
+that maps API error codes (`unsupported_mime_type`, `size_too_large`,
+`md5_mismatch`, …) and platform-level errors (network, timeout) to a
+coarse category enum and a user-facing message.
+
+**Why:** The spec asks for "categorized error messages (file too
+large / invalid type / network issues)". Centralizing the mapping in
+upload-core ensures the web and mobile clients show the *same* category
+for the same backend response, which matters when triaging support
+tickets. The UI layer keeps full control over icon, color, and copy by
+keying off the returned `category` enum.
+
+---
+
+## ADR-012: Mobile binary uploads bypass `fetch` (Expo native upload API)
+
+**Decision:** On Expo (RN 0.85), binary chunk PUTs go through
+`File.upload(url, { uploadType: BINARY_CONTENT })` instead of `fetch()`.
+Each chunk is materialized to a temp file in `Paths.cache`, uploaded, and
+deleted.
+
+**Why:** React Native's `fetch` does not send `ArrayBuffer` request
+bodies byte-for-byte — the upload succeeds at the HTTP layer but the
+server's reassembled MD5 never matches the client's. Wrapping in
+`new Blob([new Uint8Array(buf)])` is not a workaround either: RN throws
+*"Creating blobs from ArrayBuffer and ArrayBufferView are not supported"*.
+Expo's native upload API streams bytes directly off disk and arrives
+intact. The temp-file write is the cost of using a binary-safe transport
+without rewriting upload-core's chunk-driven flow.
+
+**Cancellation trade-off:** Expo's `UploadOptions` does not accept an
+`AbortSignal`. Cancel/pause during an in-flight *chunk* therefore cannot
+interrupt the native upload; the next chunk slot will see the abort and
+stop dispatching. For the MVP this is acceptable — pause/resume between
+chunks is the user-facing guarantee, not mid-chunk.

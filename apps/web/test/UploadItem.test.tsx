@@ -100,7 +100,8 @@ describe('<UploadItem /> — terminal states', () => {
   });
 
   it('renders a "View uploaded file" link for complete items with a url', () => {
-    const item = makeItem({ status: 'complete', ratio: 1, url: 'http://localhost:8000/uploads/a.jpg' });
+    // The backend returns a relative path; the component prepends env.apiUrl.
+    const item = makeItem({ status: 'complete', ratio: 1, url: '/uploads/a.jpg' });
     useUploadStore.getState().addItem(item, makeHandle());
 
     render(<UploadItem item={item} />);

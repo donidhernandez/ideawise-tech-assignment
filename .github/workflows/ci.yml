@@ -153,7 +153,12 @@ jobs:
 
       - name: Install composer dependencies
         working-directory: apps/server
-        run: composer install --no-interaction --no-progress --prefer-dist
+        # --no-scripts skips post-install cache:clear which requires a .env to boot the kernel
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Create .env for CI
+        working-directory: apps/server
+        run: cp .env.example .env
 
       - name: Lint Symfony container
         working-directory: apps/server
@@ -205,7 +210,11 @@ jobs:
 
       - name: Install composer dependencies
         working-directory: apps/server
-        run: composer install --no-interaction --no-progress --prefer-dist
+        run: composer install --no-interaction --no-progress --prefer-dist --no-scripts
+
+      - name: Create .env for CI
+        working-directory: apps/server
+        run: cp .env.example .env
 
       - name: Run Doctrine migrations (creates var/data_dev.db)
         working-directory: apps/server

@@ -36,3 +36,17 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# Symfony
+apps/server/vendor/
+apps/server/var/uploads/
+apps/server/var/storage/
+apps/server/var/data.db
+apps/server/var/log/
+apps/server/.env.local
+apps/server/.env.*.local
+
+# Expo / React Native
+apps/mobile/.expo/
+apps/mobile/node_modules/
+apps/mobile/dist/

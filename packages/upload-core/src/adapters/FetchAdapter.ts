@@ -3,7 +3,9 @@ import type { HttpAdapter, HttpRequest, HttpResponse } from './HttpAdapter.js';
 /**
  * Default browser adapter: thin wrapper around the global `fetch`.
  * Works in any environment where `fetch` is available (modern browsers,
- * React Native, Node 18+).
+ * Node 18+). For React Native, prefer a platform-specific adapter
+ * because RN's fetch handling of `ArrayBuffer` bodies is unreliable —
+ * see `apps/mobile/src/lib/expoUploadAdapter.ts`.
  */
 export class FetchAdapter implements HttpAdapter {
   private readonly fetchImpl: typeof fetch;

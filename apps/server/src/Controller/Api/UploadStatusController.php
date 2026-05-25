@@ -6,7 +6,7 @@ namespace App\Controller\Api;
 
 use App\EventSubscriber\UserIdSubscriber;
 use App\Repository\UploadRepository;
-use App\Service\ChunkStorage;
+use App\Service\ChunkStateRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -16,7 +16,7 @@ final class UploadStatusController
 {
     public function __construct(
         private readonly UploadRepository $uploads,
-        private readonly ChunkStorage $chunkStorage,
+        private readonly ChunkStateRepository $chunkState,
     ) {
     }
 
@@ -45,7 +45,7 @@ final class UploadStatusController
             'uploadId' => $upload->getId()->toRfc4122(),
             'status' => $upload->getStatus(),
             'totalChunks' => $upload->getTotalChunks(),
-            'uploadedChunks' => $this->chunkStorage->listReceivedChunks($upload->getId()),
+            'uploadedChunks' => $this->chunkState->listChunks($upload->getId()),
             'url' => $upload->getStoragePath() !== null ? '/uploads/'.$upload->getStoragePath() : null,
         ]);
     }

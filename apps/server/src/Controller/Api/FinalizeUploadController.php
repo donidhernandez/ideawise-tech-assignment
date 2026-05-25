@@ -7,6 +7,7 @@ namespace App\Controller\Api;
 use App\Entity\Upload;
 use App\EventSubscriber\UserIdSubscriber;
 use App\Repository\UploadRepository;
+use App\Service\ChunkStateRepository;
 use App\Service\ChunkStorage;
 use App\Service\DedupService;
 use App\Service\FileAssembler;
@@ -24,6 +25,7 @@ final class FinalizeUploadController
         private readonly EntityManagerInterface $em,
         private readonly UploadRepository $uploads,
         private readonly ChunkStorage $chunkStorage,
+        private readonly ChunkStateRepository $chunkState,
         private readonly FileAssembler $assembler,
         private readonly DedupService $dedup,
         private readonly Filesystem $filesystem,
@@ -103,6 +105,7 @@ final class FinalizeUploadController
         if ($existing !== null) {
             $this->filesystem->remove($tempPath);
             $this->chunkStorage->removeUploadDirectory($upload->getId());
+            $this->chunkState->removeUpload($upload->getId());
             $upload->setStatus(Upload::STATUS_COMPLETE);
             $upload->setMd5Hash($actualMd5);
             $upload->setStoragePath($existing->getStoragePath());

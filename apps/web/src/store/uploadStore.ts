@@ -31,6 +31,12 @@ export interface UploadItem {
    * file. The UI surfaces a "Re-select file to continue" affordance.
    */
   orphaned: boolean;
+  /**
+   * Set while a chunk is in the backoff delay between retry attempts.
+   * Null when not retrying (normal upload or final failure).
+   * `attempt` is the next attempt number; `total` is the max configured.
+   */
+  retryInfo: { attempt: number; total: number } | null;
 }
 
 /** Pruned shape kept in localStorage for the history panel. */

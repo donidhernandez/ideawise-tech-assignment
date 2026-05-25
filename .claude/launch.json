@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "web", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "C:\\tools\\php85\\php.exe",
+      "runtimeArgs": [
+        "-S",
+        "127.0.0.1:8000",
+        "-t",
+        "C:\\Users\\Usuario\\Documents\\development\\ideawise-tech-assignment-backend\\apps\\server\\public"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "mobile", "web"],
+      "port": 8081
+    }
+  ]
+}

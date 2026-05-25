@@ -1,159 +1,354 @@
-# Turborepo starter
+# Media File Upload System
 
-This Turborepo starter is maintained by the Turborepo core team.
+<!--
+  Update the OWNER/REPO segment of these badge URLs to your actual GitHub
+  path once the repo is pushed (e.g. ideawise/media-upload-system). The
+  workflows themselves live in .github/workflows/.
+-->
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+![PHP 8.3+](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![Expo SDK 56](https://img.shields.io/badge/Expo-SDK%2056-000020?logo=expo&logoColor=white)
+![Tests: 190+](https://img.shields.io/badge/tests-190%2B-success)
 
-## Using this example
+Tech assessment for IdeaWise. A chunked file upload system for images and
+videos that runs across **three clients** — a Symfony API, a React web
+app, and an Expo (React Native) mobile app — all sharing a single
+TypeScript upload library.
 
-Run the following command:
+Each tier lives on its own branch per the brief; `dev` is the integration
+branch.
 
-```sh
-npx create-turbo@latest
+---
+
+## At a glance
+
+| Tier | Stack | Branch | Tests | Coverage* |
+|---|---|---|---|---|
+| Backend | PHP 8.5 · Symfony 6.4 LTS · Doctrine · SQLite | `feature/backend` | 23 PHPUnit, 54 assertions | requires xdebug/pcov |
+| Web | React 19 · Vite 8 · React Compiler · Tailwind v4 · Zustand · TS strict | `feature/web` | 48 Vitest + 4 Playwright | **84 / 65 / 97 / 98** |
+| Mobile | Expo SDK 56 · RN 0.85 · expo-router (typed routes) · React Compiler · Jest | `feature/mobile` | 36 Jest | **95 / 96 / 96 / 94** |
+| Shared client | TypeScript (no runtime deps) · streaming MD5 · semaphore · backoff | `main` (`packages/upload-core`) | 61 Vitest | **92 / 79 / 97 / 94** |
+
+\* Coverage cells are `% stmt / % branch / % func / % line`. Run `pnpm coverage` at the repo root for a fresh report. PHP coverage requires Xdebug or PCOV — see [`apps/server/README.md`](apps/server/README.md#coverage).
+
+**Total: 172 automated tests + Playwright E2E that drives the SPA against a real Symfony backend.**
+
+---
+
+## Architecture
+
+```
+┌──────────────┐      ┌──────────────┐
+│   Web app    │      │  Mobile app  │
+│  (Vite + R19)│      │  (Expo SDK56)│
+└──────┬───────┘      └──────┬───────┘
+       │                     │
+       │   @repo/upload-core │
+       │  (chunking · queue  │
+       │   · retry · MD5)    │
+       └──────────┬──────────┘
+                  │
+            HTTP / JSON
+                  │
+       ┌──────────▼──────────┐
+       │   Symfony API       │
+       │   /api/uploads/…    │
+       │                     │
+       │ ┌─ SQLite (Doctrine)│
+       │ ├─ var/uploads/{id}/│
+       │ │   (in-flight)     │
+       │ └─ var/storage/Y/M/D│
+       │     {md5}_filename  │
+       └─────────────────────┘
 ```
 
-## What's inside?
+A file gets sliced client-side into 1 MiB chunks, dispatched in 3 parallel
+slots with exponential-backoff retry; the server appends each `.part`,
+sniffs MIME by magic number on chunk 0, reassembles on finalize, verifies
+MD5, deduplicates against existing files, and commits to date-partitioned
+storage.
 
-This Turborepo includes the following packages/apps:
+Full flow + protocol in [`docs/api.md`](docs/api.md). All 16 design
+decisions (storage layout, auth strategy, opt-in Redis, mobile
+background, error categorization, …) in [`docs/decisions.md`](docs/decisions.md).
 
-### Apps and Packages
+---
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## Branches
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```
+main              clean baseline: monorepo config + packages/upload-core + docs
+└─ dev            integration: every feature merged --no-ff (172+ tests green)
+   ├─ feature/backend                  apps/server (Symfony 6.4 API)
+   ├─ feature/web                      apps/web    (React 19 + Vite 8 SPA)
+   ├─ feature/mobile                   apps/mobile (Expo SDK 56 native app)
+   ├─ feature/quick-wins               rate limit / audit logs / log retention / storage-by-user
+   ├─ feature/background-upload        mobile background via TaskManager + AsyncStorage
+   ├─ feature/mobile-tests             jest-expo suite (36 tests)
+   ├─ feature/test-coverage            Vitest v8 + Jest --coverage + thresholds
+   ├─ feature/e2e-playwright           web E2E happy paths (4 tests)
+   ├─ feature/network-resilience-tests Playwright route() failure injection (4 tests)
+   ├─ feature/web-resumable            web persisted queue + re-pick resume
+   └─ feature/redis-chunks             opt-in Redis ChunkStateRepository
 ```
 
-Without global `turbo`, use your package manager:
+The brief required each tier on its own branch. Cross-cutting work
+(quick wins, background upload, coverage, E2E, resumable, Redis) lives
+in additional short-lived branches that merge into `dev` with
+`--no-ff` so the feature history stays auditable.
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+---
+
+## Repository structure
+
+```
+ideawise-tech-assignment/
+├── apps/
+│   ├── server/        ← Symfony 6.4 API (PHP 8.5)
+│   ├── web/           ← React 19 + Vite 8 SPA
+│   └── mobile/        ← Expo SDK 56 (iOS / Android / web)
+├── packages/
+│   ├── upload-core/   ← shared TS upload client (zero runtime deps)
+│   ├── ui/            ← shared React primitives (from the monorepo template)
+│   ├── eslint-config/
+│   └── typescript-config/
+├── docs/
+│   ├── api.md         ← endpoint reference
+│   └── decisions.md   ← ADRs
+├── CLAUDE.md          ← agent-onboarding doc
+└── README.md          ← you are here
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+---
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## Quick start
 
-```sh
-turbo build --filter=docs
+### Prerequisites
+
+- Node 18+ and pnpm 9
+- PHP 8.2+ (tested on 8.5) and Composer 2 (for the backend)
+- Optional: Symfony CLI for nicer dev DX
+- For mobile: Expo Go on a device or an iOS / Android simulator
+- For Playwright E2E (web only): one-time `pnpm e2e:install` downloads Chromium (~112 MB)
+- For PHP coverage (optional): Xdebug or PCOV — see `apps/server/README.md`
+
+### 1) Backend (`apps/server`)
+
+```bash
+git checkout feature/backend
+pnpm install                          # workspace-wide
+cd apps/server
+composer install
+cp .env.example .env.local
+php bin/console doctrine:migrations:migrate --no-interaction
+php -S 127.0.0.1:8000 -t public
+# or: symfony serve
 ```
 
-Without global `turbo`:
+→ `http://127.0.0.1:8000/api/uploads/init` is live.
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+### 2) Web (`apps/web`)
+
+```bash
+git checkout feature/web              # or `dev` to have everything
+pnpm install
+cp apps/web/.env.example apps/web/.env.local   # optional
+pnpm --filter web dev
 ```
 
-### Develop
+→ Open `http://localhost:3000`, drop files, watch them upload.
 
-To develop all apps and packages, run the following command:
+### 3) Mobile (`apps/mobile`)
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
+```bash
+git checkout feature/mobile           # or `dev`
+pnpm install
+cp apps/mobile/.env.example apps/mobile/.env
 ```
 
-Without global `turbo`, use your package manager:
+Edit `apps/mobile/.env` and set `EXPO_PUBLIC_API_URL` to your machine's
+**LAN IP** — `localhost` doesn't reach a phone:
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
+```
+EXPO_PUBLIC_API_URL=http://192.168.1.42:8000
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
+```bash
+pnpm --filter mobile start            # scan the QR with Expo Go
+pnpm --filter mobile ios              # iOS simulator
+pnpm --filter mobile android          # Android emulator
+pnpm --filter mobile web              # browser preview (UI sanity check only;
+                                      # the native FileHandle / picker paths
+                                      # need a real device)
 ```
 
-Without global `turbo`:
+### Running everything together (integration branch)
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+```bash
+git checkout dev
+pnpm install
+# Terminal 1
+cd apps/server && composer install && php -S 127.0.0.1:8000 -t public
+# Terminal 2
+pnpm --filter web dev
+# Terminal 3
+pnpm --filter mobile start
 ```
 
-### Remote Caching
+---
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+## Tests
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+```bash
+# Backend (PHPUnit)
+cd apps/server && php bin/phpunit --testdox
+# → OK (23 tests, 54 assertions)
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+# Shared upload client (Vitest)
+pnpm --filter @repo/upload-core test
+# → 61 tests in 6 files
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+# Web (Vitest + Testing Library)
+pnpm --filter web test
+# → 48 tests in 10 files
 
-```sh
-cd my-turborepo
-turbo login
+# Mobile (Jest + jest-expo)
+pnpm --filter mobile test
+# → 36 tests in 4 files
+
+# All JS coverages at once (via turbo)
+pnpm coverage
+
+# Web E2E (Playwright Chromium — starts vite + symfony before running)
+pnpm e2e:install                       # one-time: downloads Chromium (~112 MB)
+pnpm e2e                               # 4 tests in ~5 seconds
+
+# Type-checks
+pnpm --filter web check-types
+pnpm --filter mobile exec tsc --noEmit
+
+# Builds
+pnpm --filter web build                # ~316 KB JS / 97 KB gzip
 ```
 
-Without global `turbo`, use your package manager:
+The Playwright suite (`apps/web/e2e/`) starts both the Vite dev server and a
+PHP built-in server against `apps/server/public` before any test runs, then
+drives the full upload flow in Chromium: happy upload, error categorization
+on a text-bytes-declared-as-image rejection, deduplication on
+identical-payload re-upload, and the Remove action. See [ADR-014](docs/decisions.md#adr-014-playwright-e2e-against-the-real-backend).
 
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
+A complementary PowerShell smoke test that exercises the backend directly
+lives at `apps/server/scripts/smoke-test.ps1`.
+
+---
+
+## What `@repo/upload-core` provides
+
+The shared TypeScript client both apps depend on. Zero runtime deps so it
+runs unchanged in browsers, React Native (via Expo), and Node. Source:
+[`packages/upload-core`](packages/upload-core).
+
+```ts
+const mgr = new UploadManager(new FetchAdapter(), {
+  baseUrl: 'http://localhost:8000',
+  userId: 'demo-user',
+});
+
+const handle = mgr.upload({
+  name: file.name,
+  size: file.size,
+  mimeType: file.type,
+  slice: (start, end) => file.slice(start, end).arrayBuffer(),
+});
+
+handle.on((event) => {
+  if (event.type === 'progress') {
+    console.log(`${Math.round(event.progress.ratio * 100)}%`);
+  }
+});
+
+const result = await handle.done();  // { fileId, url, deduplicated }
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+Per-upload `pause()` / `resume()` / `cancel()`. Concurrency cap via an
+in-house semaphore. Exponential backoff with jitter, with permanent
+errors (4xx-non-retryable) failing fast. Streaming MD5 (RFC 1321
+implemented in-house) used for the finalize integrity check and the
+optional early-dedup path.
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+---
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+## Backend API (4 endpoints)
 
-```sh
-turbo link
-```
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/uploads/init` | start a session — optional early MD5 dedup |
+| `PUT`  | `/api/uploads/{id}/chunks/{idx}` | upload a single chunk |
+| `POST` | `/api/uploads/{id}/finalize` | reassemble, verify MD5, dedup, commit |
+| `GET`  | `/api/uploads/{id}/status` | resume / poll |
 
-Without global `turbo`:
+All require `X-User-Id` header. Rate-limited 10 inits/minute and 600 chunks/minute per user.
+Full request/response shapes, error codes, and the cleanup CLI in
+[`docs/api.md`](docs/api.md).
 
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
+---
 
-## Useful Links
+## Out of scope (MVP)
 
-Learn more about the power of Turborepo:
+These were called out in the advanced section of the brief and
+deliberately deferred. Reasoning lives in [`docs/decisions.md`](docs/decisions.md):
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+- **Redis** for chunk-state tracking — filesystem (`var/uploads/{id}/*.part`) is sufficient at MVP scale; `ChunkStorage` is one interface away from a Redis backend
+- **Real authentication** — `X-User-Id` header is treated as authoritative; replacing the auth subscriber is a one-file change
+- **Antimalware sandbox** (ClamAV) — limited to MIME whitelist + magic-number sniffing
+- **True byte-range resume on mobile** — current `resumePendingUploads()` re-uploads from chunk 0 and relies on MD5 dedup. ADR-013 covers the trade-off.
+- **Real-time monitoring dashboard** — would expose `/api/metrics` for Prometheus
+- **Mobile E2E** (Detox) — covered by Jest unit tests + a manual on-device pass
+- **Stress testing** — plan documented; execution out of scope
+
+---
+
+## Continuous integration
+
+Every push to `main` / `dev` and every PR runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml), which fans out
+into six parallel jobs:
+
+| Job | Runs | Artifacts |
+|---|---|---|
+| `upload-core · vitest + coverage` | `tsc` + Vitest + v8 coverage | `coverage-upload-core/` HTML |
+| `web · vitest + build + coverage` | `tsc` + Vitest + Vite production build | `coverage-web/` + `web-build/` |
+| `mobile · jest-expo + coverage` | `tsc` + Jest + coverage | `coverage-mobile/` HTML |
+| `backend · phpunit + coverage` | `composer install` + container lint + PHPUnit with PCOV | `coverage-backend/` HTML |
+| `e2e · playwright chromium` | Boots Vite + PHP backend, runs 8 Chromium tests | `playwright-report/` |
+| `CI status` | Aggregates the others as a single required check | — |
+
+Caching: pnpm via `actions/setup-node`, Composer via `actions/cache`.
+Concurrency: stale runs on the same branch are cancelled on new pushes.
+Branch protection: set "CI status" as the single required check on
+`main` / `dev`.
+
+Dependabot is wired in [`.github/dependabot.yml`](.github/dependabot.yml)
+for npm + Composer + GitHub Actions, grouped so weekly PRs stay
+reviewable.
+
+## Roadmap if continued
+
+- Promote the upload-history view from web to mobile (Zustand persist over
+  AsyncStorage is already wired for the active queue — adding the history
+  slice is a small change)
+- True byte-range resume on mobile: have `/init` accept an existing
+  `uploadId` and return populated `existingChunks`; `upload-core` already
+  honors `existingChunks`
+- Replace `X-User-Id` with JWT verification in `UserIdSubscriber`
+- Mobile Detox E2E to mirror the web Playwright pass
+- Codecov / Codacy integration on top of the existing coverage artifacts
+- Stress test execution via the k6 plan in roadmap
+
+---
+
+## License
+
+See per-app `LICENSE` files where present (the Expo scaffold ships one).
+The custom code in this repo is unlicensed pending the assessment outcome.

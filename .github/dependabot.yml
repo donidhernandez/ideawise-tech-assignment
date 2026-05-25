@@ -1,0 +1,62 @@
+version: 2
+updates:
+  # ───── npm (pnpm workspaces) ─────
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    labels: [dependencies, javascript]
+    groups:
+      # Group dev-only tooling into one PR per week to avoid noise
+      dev-tooling:
+        applies-to: version-updates
+        dependency-type: development
+        patterns:
+          - 'eslint*'
+          - '@types/*'
+          - 'typescript'
+          - 'prettier'
+          - 'vitest'
+          - '@vitest/*'
+          - 'jest'
+          - 'jest-expo'
+          - '@testing-library/*'
+      # Group all React-ecosystem runtime deps so they move together
+      react-stack:
+        applies-to: version-updates
+        dependency-type: production
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - 'react-native'
+          - 'react-native-*'
+
+  # ───── Composer (Symfony backend) ─────
+  - package-ecosystem: composer
+    directory: /apps/server
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies, php]
+    groups:
+      symfony:
+        patterns:
+          - 'symfony/*'
+      doctrine:
+        patterns:
+          - 'doctrine/*'
+
+  # ───── GitHub Actions versions ─────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies, github-actions]

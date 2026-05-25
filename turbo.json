@@ -11,6 +11,11 @@
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$"]
     },
+    "coverage": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$"],
+      "outputs": ["coverage/**"]
+    },
     "lint": {
       "dependsOn": ["^lint"]
     },

@@ -4,11 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UploadItem } from '../src/components/UploadItem';
 import { useUploadStore, type UploadItem as UploadItemModel } from '../src/store/uploadStore';
 
-function makeHandle(): UploadHandle & {
-  pause: ReturnType<typeof vi.fn>;
-  resume: ReturnType<typeof vi.fn>;
-  cancel: ReturnType<typeof vi.fn>;
-} {
+function makeHandle(): UploadHandle {
   return {
     uploadId: null,
     status: 'idle',
@@ -17,7 +13,7 @@ function makeHandle(): UploadHandle & {
     cancel: vi.fn().mockResolvedValue(undefined),
     on: vi.fn().mockReturnValue(() => {}),
     done: vi.fn().mockResolvedValue({ fileId: 'x', url: '/x', deduplicated: false }),
-  };
+  } as unknown as UploadHandle;
 }
 
 function makeItem(overrides: Partial<UploadItemModel>): UploadItemModel {
@@ -35,6 +31,7 @@ function makeItem(overrides: Partial<UploadItemModel>): UploadItemModel {
     errorCategory: null,
     previewUrl: null,
     deduplicated: false,
+    orphaned: false,
     ...overrides,
   };
 }

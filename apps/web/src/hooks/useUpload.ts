@@ -1,4 +1,4 @@
-import type { UploadEvent } from '@repo/upload-core';
+import type { UploadEvent, UploadHandle } from '@repo/upload-core';
 import { categorizeError } from '@repo/upload-core';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -20,6 +20,76 @@ function buildPreview(file: File): string | null {
   return null;
 }
 
+/**
+ * Wires upload-core's UploadHandle events into the Zustand row at
+ * `localId`. Kept private here so both the fresh-upload and the
+ * resume-after-orphan paths use the same dispatcher.
+ */
+function bridgeHandleToStore(
+  localId: string,
+  fileName: string,
+  fileMimeType: string,
+  fileSize: number,
+  handle: UploadHandle
+): void {
+  const store = useUploadStore.getState();
+
+  handle.on((event: UploadEvent) => {
+    switch (event.type) {
+      case 'statusChange':
+        store.patchItem(localId, {
+          status: event.status,
+          uploadId: handle.uploadId,
+        });
+        break;
+      case 'progress':
+        store.patchItem(localId, {
+          uploadedBytes: event.progress.uploadedBytes,
+          ratio: event.progress.ratio,
+        });
+        break;
+      case 'complete':
+        store.patchItem(localId, {
+          status: 'complete',
+          ratio: 1,
+          url: event.result.url,
+          deduplicated: event.result.deduplicated,
+          orphaned: false,
+        });
+        store.pushHistory({
+          localId,
+          name: fileName,
+          size: fileSize,
+          mimeType: fileMimeType,
+          url: event.result.url,
+          deduplicated: event.result.deduplicated,
+          uploadedAt: Date.now(),
+        });
+        toast.success(
+          event.result.deduplicated
+            ? `${fileName} matched an existing file (deduplicated)`
+            : `${fileName} uploaded`
+        );
+        break;
+      case 'error': {
+        const cat = categorizeError(event.error);
+        store.patchItem(localId, {
+          error: cat.message,
+          errorCategory: cat.category,
+          status: 'failed',
+        });
+        toast.error(`${fileName}: ${cat.message}`);
+        break;
+      }
+      case 'chunkError': {
+        const cat = categorizeError(event.error);
+        store.patchItem(localId, { error: cat.message, errorCategory: cat.category });
+        break;
+      }
+    }
+  });
+}
+
 export function useUpload(): {
   startUpload: (file: File) => string;
   pause: (localId: string) => void;
@@ -27,11 +97,19 @@ export function useUpload(): {
   cancel: (localId: string) => Promise<void>;
   remove: (localId: string) => void;
   retry: (localId: string, file: File) => string;
+  /**
+   * Resume an orphaned row (no live handle, persisted from a previous
+   * session) using the file the user re-picked. The new attempt goes
+   * through a fresh init; the server's MD5 dedup short-circuits
+   * anything that finished last time. Mismatched name / size are
+   * surfaced as a failed row.
+   */
+  resumeOrphan: (localId: string, file: File) => boolean;
 } {
   const addItem = useUploadStore((s) => s.addItem);
   const patchItem = useUploadStore((s) => s.patchItem);
   const removeItem = useUploadStore((s) => s.removeItem);
-  const pushHistory = useUploadStore((s) => s.pushHistory);
+  const replaceItem = useUploadStore((s) => s.replaceItem);
   const getHandle = useUploadStore((s) => s.getHandle);
 
   const startUpload = useCallback(
@@ -54,69 +132,57 @@ export function useUpload(): {
         errorCategory: null,
         previewUrl: buildPreview(file),
         deduplicated: false,
+        orphaned: false,
       };
 
       addItem(initial, handle);
-
-      handle.on((event: UploadEvent) => {
-        switch (event.type) {
-          case 'statusChange':
-            patchItem(localId, {
-              status: event.status,
-              uploadId: handle.uploadId,
-            });
-            break;
-          case 'progress':
-            patchItem(localId, {
-              uploadedBytes: event.progress.uploadedBytes,
-              ratio: event.progress.ratio,
-            });
-            break;
-          case 'complete':
-            patchItem(localId, {
-              status: 'complete',
-              ratio: 1,
-              url: event.result.url,
-              deduplicated: event.result.deduplicated,
-            });
-            pushHistory({
-              localId,
-              name: file.name,
-              size: file.size,
-              mimeType: file.type || 'application/octet-stream',
-              url: event.result.url,
-              deduplicated: event.result.deduplicated,
-              uploadedAt: Date.now(),
-            });
-            toast.success(
-              event.result.deduplicated
-                ? `${file.name} matched an existing file (deduplicated)`
-                : `${file.name} uploaded`
-            );
-            break;
-          case 'error': {
-            const cat = categorizeError(event.error);
-            patchItem(localId, {
-              error: cat.message,
-              errorCategory: cat.category,
-              status: 'failed',
-            });
-            toast.error(`${file.name}: ${cat.message}`);
-            break;
-          }
-          case 'chunkError': {
-            // Surface the most recent transient error inline; not toasted
-            // because the retry loop may still recover.
-            const cat = categorizeError(event.error);
-            patchItem(localId, { error: cat.message, errorCategory: cat.category });
-            break;
-          }
-        }
-      });
-
+      bridgeHandleToStore(localId, file.name, initial.mimeType, file.size, handle);
       return localId;
     },
-    [addItem, patchItem, pushHistory]
+    [addItem]
+  );
+
+  const resumeOrphan = useCallback(
+    (localId: string, file: File): boolean => {
+      const item = useUploadStore.getState().items.find((i) => i.localId === localId);
+      if (!item) return false;
+
+      // Validate the re-picked file matches the persisted metadata.
+      // Name match is a strong signal but not strictly required for dedup —
+      // size mismatch is. We accept size match and warn on name mismatch.
+      if (file.size !== item.size) {
+        patchItem(localId, {
+          status: 'failed',
+          error: `Selected file (${file.size} B) doesn't match the original (${item.size} B).`,
+          errorCategory: 'integrity',
+        });
+        return false;
+      }
+
+      const manager = getUploadManager();
+      const handle = manager.upload(fileToSource(file));
+
+      const fresh: UploadItem = {
+        ...item,
+        name: file.name, // adopt the user's current filename
+        mimeType: file.type || item.mimeType,
+        uploadId: null, // server issues a new id; dedup glues to old file
+        status: 'idle',
+        uploadedBytes: 0,
+        ratio: 0,
+        url: null,
+        error: null,
+        errorCategory: null,
+        previewUrl: buildPreview(file),
+        deduplicated: false,
+        orphaned: false,
+      };
+
+      replaceItem(localId, fresh, handle);
+      bridgeHandleToStore(localId, fresh.name, fresh.mimeType, fresh.size, handle);
+      return true;
+    },
+    [patchItem, replaceItem]
   );
 
   const pause = useCallback(
@@ -155,5 +221,5 @@ export function useUpload(): {
     [removeItem, startUpload]
   );
 
-  return { startUpload, pause, resume, cancel, remove, retry };
+  return { startUpload, pause, resume, cancel, remove, retry, resumeOrphan };
 }

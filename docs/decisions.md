@@ -275,3 +275,42 @@ it between local runs is optional.
 Actions workflow would (a) `composer install` the backend, (b)
 `pnpm install` + `pnpm exec playwright install --with-deps chromium`,
 (c) run `pnpm e2e`. Out of scope for this PR.
+
+---
+
+## ADR-015: Web resumable upload — persist + "re-select to continue"
+
+**Decision:** The web app now persists the active upload queue (not
+only the history) to `localStorage` via Zustand's `persist` middleware.
+On reload, any row that was in an active state is demoted to
+`paused` + `orphaned: true`, and the UI surfaces a **Re-select** button
+that re-opens the file picker scoped to the original MIME family. Once
+the user re-picks a file whose size matches the persisted metadata,
+the upload restarts; the server's MD5 dedup short-circuits any chunk
+that was already finalized in the previous session.
+
+**Why not a true byte-range resume:** Browsers do not preserve a
+`File` reference across page reloads — there is no equivalent to
+mobile's persistent file URI. The user *must* re-pick the file. Given
+that constraint, restarting the upload-core run and relying on
+server-side dedup is functionally equivalent to a byte-range resume
+for the user when the file already exists on the server (one extra
+init + finalize round trip), and is mandatory anyway when the file
+does not yet exist on the server (every chunk must be re-uploaded).
+
+**State persisted vs not:**
+- Persisted: `items[]` (queue metadata) + `history[]` (last 20 finalized).
+- Not persisted: `_handles` (the live `UploadHandle` map) and any
+  `previewUrl` blob URLs. Both are session-only by design — handles
+  cannot be serialized, blob URLs cannot survive a reload.
+
+**Validation on re-pick:** name is adopted from the new pick, but size
+must match. A mismatch fails the row with the `integrity` category and
+a clear "doesn't match the original" message rather than starting a
+fresh-but-wrong upload.
+
+**Origin Private File System (OPFS):** considered as a future
+enhancement — copying the picked bytes into OPFS on first pick would
+let the page reload and resume without user interaction. Excluded from
+this PR to keep the scope tight and because OPFS support varies by
+browser engine.

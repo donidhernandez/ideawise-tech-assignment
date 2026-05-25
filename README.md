@@ -1,7 +1,7 @@
 # Media File Upload System
 
 [![CI](https://github.com/donidhernandez/ideawise-tech-assignment/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/donidhernandez/ideawise-tech-assignment/actions/workflows/ci.yml)
-![PHP 8.3+](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
+![PHP 8.4+](https://img.shields.io/badge/PHP-8.4+-777BB4?logo=php&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Expo SDK 56](https://img.shields.io/badge/Expo-SDK%2056-000020?logo=expo&logoColor=white)
 ![Tests: 190+](https://img.shields.io/badge/tests-190%2B-success)
@@ -122,7 +122,7 @@ ideawise-tech-assignment/
 ### Prerequisites
 
 - Node 18+ and pnpm 9
-- PHP 8.2+ (tested on 8.5) and Composer 2 (for the backend)
+- PHP 8.4+ and Composer 2 (for the backend) and Composer 2 (for the backend)
 - Optional: Symfony CLI for nicer dev DX
 - For mobile: Expo Go on a device or an iOS / Android simulator
 - For Playwright E2E (web only): one-time `pnpm e2e:install` downloads Chromium (~112 MB)

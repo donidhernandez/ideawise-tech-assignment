@@ -14,6 +14,9 @@ class FileAssembler
         private readonly Filesystem $filesystem,
         private readonly string $storageDir,
     ) {
+        // Ensure the root storage directory exists from the very first request so
+        // that ServeUploadController can always resolve it via realpath().
+        $filesystem->mkdir($storageDir, 0775);
     }
 
     /**

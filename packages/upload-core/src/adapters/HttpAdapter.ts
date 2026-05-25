@@ -15,13 +15,14 @@ export interface HttpResponse {
 }
 
 export class HttpError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly body: unknown,
-    message: string
-  ) {
+  readonly status: number;
+  readonly body: unknown;
+
+  constructor(status: number, body: unknown, message: string) {
     super(message);
     this.name = 'HttpError';
+    this.status = status;
+    this.body = body;
   }
 
   /** Anything 4xx except 408/425/429 is a permanent error — not worth retrying. */

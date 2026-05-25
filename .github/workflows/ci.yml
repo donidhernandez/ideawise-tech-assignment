@@ -1,0 +1,258 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+# Cancel an in-progress run when a new commit lands on the same branch /
+# PR — saves CI minutes and stops stale results from masking new ones.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+  PHP_VERSION: '8.3'
+
+jobs:
+  # ────────────────────────────────────────────────────────────────
+  # Shared upload-core library — pure TS, no DOM / RN deps
+  # ────────────────────────────────────────────────────────────────
+  upload-core:
+    name: upload-core · vitest + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: '${{ env.PNPM_VERSION }}' }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '${{ env.NODE_VERSION }}'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter @repo/upload-core check-types
+
+      - name: Test + coverage
+        run: pnpm --filter @repo/upload-core coverage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-upload-core
+          path: packages/upload-core/coverage/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────
+  # Web SPA — Vitest + tsc + production build
+  # ────────────────────────────────────────────────────────────────
+  web:
+    name: web · vitest + build + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: '${{ env.PNPM_VERSION }}' }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '${{ env.NODE_VERSION }}'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter web check-types
+
+      - name: Test + coverage
+        run: pnpm --filter web coverage
+
+      - name: Production build
+        run: pnpm --filter web build
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-web
+          path: apps/web/coverage/
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: web-build
+          path: apps/web/dist/
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────
+  # Expo mobile — Jest + tsc (no native build; that's an EAS concern)
+  # ────────────────────────────────────────────────────────────────
+  mobile:
+    name: mobile · jest-expo + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: '${{ env.PNPM_VERSION }}' }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '${{ env.NODE_VERSION }}'
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter mobile exec tsc --noEmit
+
+      - name: Test + coverage
+        run: pnpm --filter mobile coverage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-mobile
+          path: apps/mobile/coverage/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────
+  # Symfony backend — composer install + PHPUnit (with PCOV coverage)
+  # ────────────────────────────────────────────────────────────────
+  backend:
+    name: backend · phpunit + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '${{ env.PHP_VERSION }}'
+          extensions: ctype, iconv, fileinfo, intl, mbstring, openssl, sqlite3, pdo_sqlite, zip
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/server/vendor
+            ~/.composer/cache
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('apps/server/composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
+
+      - name: Install composer dependencies
+        working-directory: apps/server
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Lint Symfony container
+        working-directory: apps/server
+        run: php bin/console lint:container
+
+      - name: PHPUnit + coverage
+        working-directory: apps/server
+        run: vendor/bin/phpunit --testdox --coverage-text --coverage-html=var/coverage
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-backend
+          path: apps/server/var/coverage/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────
+  # Playwright E2E — boots vite + symfony together, runs Chromium
+  # ────────────────────────────────────────────────────────────────
+  e2e:
+    name: e2e · playwright chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: [backend, web]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: '${{ env.PNPM_VERSION }}' }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '${{ env.NODE_VERSION }}'
+          cache: pnpm
+
+      - name: Set up PHP for the backend webServer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '${{ env.PHP_VERSION }}'
+          extensions: ctype, iconv, fileinfo, intl, mbstring, openssl, sqlite3, pdo_sqlite, zip
+          tools: composer:v2
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/server/vendor
+            ~/.composer/cache
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('apps/server/composer.lock') }}
+
+      - name: Install composer dependencies
+        working-directory: apps/server
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run Doctrine migrations (creates var/data_dev.db)
+        working-directory: apps/server
+        run: php bin/console doctrine:migrations:migrate --no-interaction
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium + system deps
+        run: pnpm --filter web exec playwright install --with-deps chromium
+
+      - name: Run Playwright
+        # playwright.config.ts branches on process.platform to pick the
+        # right `php` command, so this works unchanged on the Linux runner
+        # (uses `php` on PATH from shivammathur/setup-php).
+        run: pnpm --filter web e2e
+        env:
+          CI: 'true'
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────
+  # Aggregated status check — useful as a single required check on
+  # branch protection rules (no need to list every job individually).
+  # ────────────────────────────────────────────────────────────────
+  ci-status:
+    name: CI status
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [upload-core, web, mobile, backend, e2e]
+    steps:
+      - name: Fail if any upstream job failed or was canceled
+        if: |
+          contains(needs.*.result, 'failure') ||
+          contains(needs.*.result, 'cancelled')
+        run: |
+          echo "One or more required jobs failed."
+          exit 1
+      - run: echo "All required jobs passed."

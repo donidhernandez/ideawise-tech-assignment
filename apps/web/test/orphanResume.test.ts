@@ -71,18 +71,14 @@ describe('rehydrateAsOrphans', () => {
 
 describe('replaceItem', () => {
   it('swaps an existing row with a fresh one, attaching a new handle', () => {
-    const oldHandle = { uploadId: null, status: 'idle' } as unknown as Parameters<
-      typeof useUploadStore.getState
-    >[0] extends never ? never : never;
-    void oldHandle;
     const store = useUploadStore.getState();
-    store.setState?.({}); // type guard; not used
+    const oldHandle = {} as never; // UploadHandle shape isn't exercised here
+    const newHandle = {} as never;
 
     const original = makeItem({ localId: 'a', orphaned: true, status: 'paused' });
-    store.addItem(original, { /* mocked */ } as never);
+    store.addItem(original, oldHandle);
 
     const fresh = makeItem({ localId: 'a', name: 'new-name.jpg', orphaned: false, status: 'idle' });
-    const newHandle = {} as never;
     store.replaceItem('a', fresh, newHandle);
 
     const row = useUploadStore.getState().items.find((i) => i.localId === 'a');

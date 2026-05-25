@@ -1,5 +1,16 @@
 # Media File Upload System
 
+<!--
+  Update the OWNER/REPO segment of these badge URLs to your actual GitHub
+  path once the repo is pushed (e.g. ideawise/media-upload-system). The
+  workflows themselves live in .github/workflows/.
+-->
+[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+![PHP 8.3+](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
+![Expo SDK 56](https://img.shields.io/badge/Expo-SDK%2056-000020?logo=expo&logoColor=white)
+![Tests: 190+](https://img.shields.io/badge/tests-190%2B-success)
+
 Tech assessment for IdeaWise. A chunked file upload system for images and
 videos that runs across **three clients** — a Symfony API, a React web
 app, and an Expo (React Native) mobile app — all sharing a single
@@ -298,6 +309,30 @@ deliberately deferred. Reasoning lives in [`docs/decisions.md`](docs/decisions.m
 
 ---
 
+## Continuous integration
+
+Every push to `main` / `dev` and every PR runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml), which fans out
+into six parallel jobs:
+
+| Job | Runs | Artifacts |
+|---|---|---|
+| `upload-core · vitest + coverage` | `tsc` + Vitest + v8 coverage | `coverage-upload-core/` HTML |
+| `web · vitest + build + coverage` | `tsc` + Vitest + Vite production build | `coverage-web/` + `web-build/` |
+| `mobile · jest-expo + coverage` | `tsc` + Jest + coverage | `coverage-mobile/` HTML |
+| `backend · phpunit + coverage` | `composer install` + container lint + PHPUnit with PCOV | `coverage-backend/` HTML |
+| `e2e · playwright chromium` | Boots Vite + PHP backend, runs 8 Chromium tests | `playwright-report/` |
+| `CI status` | Aggregates the others as a single required check | — |
+
+Caching: pnpm via `actions/setup-node`, Composer via `actions/cache`.
+Concurrency: stale runs on the same branch are cancelled on new pushes.
+Branch protection: set "CI status" as the single required check on
+`main` / `dev`.
+
+Dependabot is wired in [`.github/dependabot.yml`](.github/dependabot.yml)
+for npm + Composer + GitHub Actions, grouped so weekly PRs stay
+reviewable.
+
 ## Roadmap if continued
 
 - Promote the upload-history view from web to mobile (Zustand persist over
@@ -307,11 +342,9 @@ deliberately deferred. Reasoning lives in [`docs/decisions.md`](docs/decisions.m
   `uploadId` and return populated `existingChunks`; `upload-core` already
   honors `existingChunks`
 - Replace `X-User-Id` with JWT verification in `UserIdSubscriber`
-- Add a `RedisChunkStorage` and make the backend swap between filesystem
-  and Redis via env config
 - Mobile Detox E2E to mirror the web Playwright pass
-- CI: GitHub Actions matrix running PHPUnit + the three JS test suites +
-  Playwright on every PR
+- Codecov / Codacy integration on top of the existing coverage artifacts
+- Stress test execution via the k6 plan in roadmap
 
 ---
 

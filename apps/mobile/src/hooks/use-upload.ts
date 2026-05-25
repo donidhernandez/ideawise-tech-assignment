@@ -3,26 +3,12 @@ import { categorizeError } from '@repo/upload-core';
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
 import { assetToSource } from '@/lib/expoFileSource';
+import { deriveName, inferMime, makeLocalId, type InferenceAsset } from '@/lib/inference';
 import { getUploadManager } from '@/lib/manager';
 import { useUploadStore, type UploadItem } from '@/store/uploadStore';
 
-interface PickedAsset {
-  uri: string;
-  fileName?: string | null;
-  mimeType?: string | null;
+interface PickedAsset extends InferenceAsset {
   fileSize?: number;
-  type?: 'image' | 'video' | 'livePhoto' | 'pairedVideo' | null;
-}
-
-function makeLocalId(): string {
-  return `upl-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function inferMime(asset: PickedAsset): string {
-  if (asset.mimeType) return asset.mimeType;
-  if (asset.type === 'video') return 'video/mp4';
-  if (asset.type === 'image') return 'image/jpeg';
-  return 'application/octet-stream';
 }
 
 export function useUpload(): {
@@ -140,9 +126,4 @@ export function useUpload(): {
   );
 
   return { startUpload, pause, resume, cancel, remove };
-}
-
-function deriveName(uri: string): string {
-  const tail = uri.split('/').pop() ?? `capture-${Date.now()}`;
-  return decodeURIComponent(tail);
 }

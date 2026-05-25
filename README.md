@@ -1,11 +1,6 @@
 # Media File Upload System
 
-<!--
-  Update the OWNER/REPO segment of these badge URLs to your actual GitHub
-  path once the repo is pushed (e.g. ideawise/media-upload-system). The
-  workflows themselves live in .github/workflows/.
--->
-[![CI](https://github.com/OWNER/REPO/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/OWNER/REPO/actions/workflows/ci.yml)
+[![CI](https://github.com/donidhernandez/ideawise-tech-assignment/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/donidhernandez/ideawise-tech-assignment/actions/workflows/ci.yml)
 ![PHP 8.3+](https://img.shields.io/badge/PHP-8.3+-777BB4?logo=php&logoColor=white)
 ![React 19](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Expo SDK 56](https://img.shields.io/badge/Expo-SDK%2056-000020?logo=expo&logoColor=white)

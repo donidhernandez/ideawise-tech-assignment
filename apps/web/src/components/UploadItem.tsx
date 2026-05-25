@@ -1,6 +1,7 @@
 import type { ErrorCategory } from '@repo/upload-core';
 import { useRef } from 'react';
 import { toast } from 'sonner';
+import { env } from '../env.ts';
 import { useUpload } from '../hooks/useUpload.ts';
 import { formatBytes } from '../lib/format.ts';
 import type { UploadItem as UploadItemModel } from '../store/uploadStore.ts';
@@ -107,7 +108,7 @@ export function UploadItem({ item }: Props) {
 
           {item.url && (
             <a
-              href={item.url}
+              href={env.apiUrl + item.url}
               target="_blank"
               rel="noreferrer"
               className="mt-2 inline-block text-xs font-medium text-violet-600 hover:underline"

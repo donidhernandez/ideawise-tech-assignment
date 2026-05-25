@@ -33,8 +33,33 @@ export function HistoryPanel() {
       </header>
       <ul className="divide-y divide-zinc-100">
         {history.map((h) => (
-          <li key={h.localId} className="flex items-center justify-between gap-3 px-4 py-3">
-            <div className="min-w-0">
+          <li key={h.localId} className="flex items-center gap-3 px-4 py-3">
+            {h.mimeType.startsWith('image/') ? (
+              <a href={env.apiUrl + h.url} target="_blank" rel="noreferrer" tabIndex={-1} className="shrink-0">
+                <img
+                  src={env.apiUrl + h.url}
+                  alt={h.name}
+                  className="h-10 w-10 rounded-md object-cover ring-1 ring-zinc-200"
+                />
+              </a>
+            ) : (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-zinc-100 ring-1 ring-zinc-200">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-zinc-500">
+                  {h.mimeType.startsWith('video/') ? (
+                    <>
+                      <polygon points="23 7 16 12 23 17 23 7" />
+                      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </>
+                  )}
+                </svg>
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
               <a
                 href={env.apiUrl + h.url}
                 target="_blank"

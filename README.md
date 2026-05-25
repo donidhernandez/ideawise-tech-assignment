@@ -20,7 +20,7 @@ branch.
 
 | Tier | Stack | Branch | Tests | Coverage* |
 |---|---|---|---|---|
-| Backend | PHP 8.5 · Symfony 6.4 LTS · Doctrine · SQLite | `feature/backend` | 23 PHPUnit, 54 assertions | requires xdebug/pcov |
+| Backend | PHP 8.4+ · Symfony 6.4 LTS · Doctrine · SQLite | `feature/backend` | 23 PHPUnit, 54 assertions | requires xdebug/pcov |
 | Web | React 19 · Vite 8 · React Compiler · Tailwind v4 · Zustand · TS strict | `feature/web` | 48 Vitest + 4 Playwright | **84 / 65 / 97 / 98** |
 | Mobile | Expo SDK 56 · RN 0.85 · expo-router (typed routes) · React Compiler · Jest | `feature/mobile` | 36 Jest | **95 / 96 / 96 / 94** |
 | Shared client | TypeScript (no runtime deps) · streaming MD5 · semaphore · backoff | `main` (`packages/upload-core`) | 61 Vitest | **92 / 79 / 97 / 94** |
@@ -121,38 +121,55 @@ ideawise-tech-assignment/
 
 ### Prerequisites
 
-- Node 18+ and pnpm 9
-- PHP 8.4+ and Composer 2 (for the backend) and Composer 2 (for the backend)
-- Optional: Symfony CLI for nicer dev DX
-- For mobile: Expo Go on a device or an iOS / Android simulator
+- **Node 20+** and **pnpm 9** (`npm i -g pnpm`)
+- **PHP 8.4+** and **Composer 2** (`composer --version`)
+- **Symfony CLI** — recommended for the backend (`symfony serve`, TLS, port management): https://symfony.com/download
+- **Expo Go** on a physical device _or_ an iOS Simulator / Android Emulator for mobile
 - For Playwright E2E (web only): one-time `pnpm e2e:install` downloads Chromium (~112 MB)
-- For PHP coverage (optional): Xdebug or PCOV — see `apps/server/README.md`
+- PHP coverage (optional, backend only): Xdebug or PCOV — see `apps/server/README.md`
 
 ### 1) Backend (`apps/server`)
 
 ```bash
-git checkout feature/backend
-pnpm install                          # workspace-wide
+git checkout feature/backend          # or `dev` to get everything at once
 cd apps/server
 composer install
-cp .env.example .env.local
+cp .env.example .env.local            # keep secrets out of .env
+```
+
+Run database migrations:
+
+```bash
+# With Symfony CLI (recommended)
+symfony console doctrine:migrations:migrate --no-interaction
+
+# Without Symfony CLI
 php bin/console doctrine:migrations:migrate --no-interaction
+```
+
+Start the dev server:
+
+```bash
+# With Symfony CLI — hot-reload, HTTPS, custom port
+symfony serve --port=8000
+
+# Without Symfony CLI — bare PHP built-in server
 php -S 127.0.0.1:8000 -t public
-# or: symfony serve
 ```
 
 → `http://127.0.0.1:8000/api/uploads/init` is live.
+→ Test instantly: `curl -X POST http://127.0.0.1:8000/api/uploads/init -H "X-User-Id: dev" -H "Content-Type: application/json" -d '{"filename":"test.jpg","size":1048576,"mimeType":"image/jpeg","totalChunks":1}'`
 
 ### 2) Web (`apps/web`)
 
 ```bash
-git checkout feature/web              # or `dev` to have everything
-pnpm install
-cp apps/web/.env.example apps/web/.env.local   # optional
-pnpm --filter web dev
+git checkout feature/web              # or `dev`
+pnpm install                          # workspace-wide, run from repo root
+cp apps/web/.env.example apps/web/.env.local   # set VITE_API_URL if needed
+pnpm --filter web dev                 # starts Vite on http://localhost:3000
 ```
 
-→ Open `http://localhost:3000`, drop files, watch them upload.
+→ Open `http://localhost:3000`, drop image / video files, watch them upload.
 
 ### 3) Mobile (`apps/mobile`)
 
@@ -162,20 +179,43 @@ pnpm install
 cp apps/mobile/.env.example apps/mobile/.env
 ```
 
-Edit `apps/mobile/.env` and set `EXPO_PUBLIC_API_URL` to your machine's
-**LAN IP** — `localhost` doesn't reach a phone:
+Edit `apps/mobile/.env` — set `EXPO_PUBLIC_API_URL` to your machine's **LAN IP**
+(`localhost` only works for Android emulator via the `10.0.2.2` alias):
 
-```
+```ini
+# Physical device / LAN
 EXPO_PUBLIC_API_URL=http://192.168.1.42:8000
+
+# Android emulator alias for host localhost
+EXPO_PUBLIC_API_URL=http://10.0.2.2:8000
+
+# iOS Simulator (same machine)
+EXPO_PUBLIC_API_URL=http://localhost:8000
 ```
+
+Start the Expo dev server:
 
 ```bash
-pnpm --filter mobile start            # scan the QR with Expo Go
-pnpm --filter mobile ios              # iOS simulator
-pnpm --filter mobile android          # Android emulator
-pnpm --filter mobile web              # browser preview (UI sanity check only;
-                                      # the native FileHandle / picker paths
-                                      # need a real device)
+# Via Turborepo / pnpm filter (recommended from repo root)
+pnpm --filter mobile start            # shows QR → scan with Expo Go
+
+# Or directly with Expo CLI (from apps/mobile/)
+npx expo start
+npx expo start --clear                # clears Metro cache
+```
+
+Open on device or simulator:
+
+```bash
+# From repo root
+pnpm --filter mobile ios              # iOS Simulator
+pnpm --filter mobile android          # Android Emulator
+
+# From apps/mobile/ directly
+npx expo run:ios
+npx expo run:android
+
+# Press `i` / `a` inside the running Expo CLI for the same effect
 ```
 
 ### Running everything together (integration branch)
@@ -183,11 +223,15 @@ pnpm --filter mobile web              # browser preview (UI sanity check only;
 ```bash
 git checkout dev
 pnpm install
-# Terminal 1
-cd apps/server && composer install && php -S 127.0.0.1:8000 -t public
-# Terminal 2
+
+# Terminal 1 — Symfony backend
+cd apps/server && symfony serve --port=8000
+# (or: php -S 127.0.0.1:8000 -t public)
+
+# Terminal 2 — React web app
 pnpm --filter web dev
-# Terminal 3
+
+# Terminal 3 — Expo mobile (point .env at LAN IP first)
 pnpm --filter mobile start
 ```
 

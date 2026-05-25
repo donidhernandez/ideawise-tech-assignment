@@ -239,3 +239,39 @@ small change, deferred until the assessment proves we need it.
 - Android transfers can survive backgrounding but are killed if the OS
   reclaims the process. WorkManager-backed continuation would require
   a custom native module beyond the v56 surface.
+
+---
+
+## ADR-014: Playwright E2E against the real backend
+
+**Decision:** The web app's end-to-end suite runs with **Playwright**
+inside `apps/web/e2e/`. Playwright's `webServer` config starts a real
+Vite dev server on `:3000` and a real PHP built-in server on `:8000`
+against `apps/server/public`, then drives the SPA in Chromium against
+that live stack.
+
+**Why not mock the backend:**
+1. The integration points that historically broke (RN's `ArrayBuffer`
+   coerce in fetch, the user-id storage path, MIME magic-number
+   verification, dedup short-circuit) only surface against a real
+   server. Recreating them in MSW or similar would re-implement half
+   of the Symfony controllers.
+2. The test cost is low — the SQLite backend cold-starts in ~1 s and a
+   full happy-path upload is sub-second on localhost. The full
+   `pnpm e2e` matrix completes in ~5 seconds.
+
+**Determinism:** Each test seeds its synthetic payload with
+`Date.now() + Math.random()*10_000`, so two runs against the same DB
+never collide on MD5. The "dedup" test reuses one seed within itself,
+which is what triggers the server's deduplication path on the second
+upload.
+
+**State between runs:** Tests intentionally leave rows in the DB. The
+`app:uploads:cleanup` command sweeps stale and expired uploads; running
+it between local runs is optional.
+
+**CI considerations (deferred):** the config sets `forbidOnly`,
+`retries: 1`, and `workers: 1` when `process.env.CI` is set. A GitHub
+Actions workflow would (a) `composer install` the backend, (b)
+`pnpm install` + `pnpm exec playwright install --with-deps chromium`,
+(c) run `pnpm e2e`. Out of scope for this PR.

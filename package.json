@@ -8,7 +8,9 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
-    "coverage": "turbo run coverage"
+    "coverage": "turbo run coverage",
+    "e2e": "pnpm --filter web e2e",
+    "e2e:install": "pnpm --filter web e2e:install"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

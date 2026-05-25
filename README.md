@@ -15,13 +15,13 @@ branch.
 | Tier | Stack | Branch | Tests | Coverage* |
 |---|---|---|---|---|
 | Backend | PHP 8.5 · Symfony 6.4 LTS · Doctrine · SQLite | `feature/backend` | 23 PHPUnit, 54 assertions | requires xdebug/pcov |
-| Web | React 19 · Vite 8 · React Compiler · Tailwind v4 · Zustand · TS strict | `feature/web` | 48 Vitest | **84 / 65 / 97 / 98** |
+| Web | React 19 · Vite 8 · React Compiler · Tailwind v4 · Zustand · TS strict | `feature/web` | 48 Vitest + 4 Playwright | **84 / 65 / 97 / 98** |
 | Mobile | Expo SDK 56 · RN 0.85 · expo-router (typed routes) · React Compiler · Jest | `feature/mobile` | 36 Jest | **95 / 96 / 96 / 94** |
 | Shared client | TypeScript (no runtime deps) · streaming MD5 · semaphore · backoff | `main` (`packages/upload-core`) | 61 Vitest | **92 / 79 / 97 / 94** |
 
 \* Coverage cells are `% stmt / % branch / % func / % line`. Run `pnpm coverage` at the repo root for a fresh report. PHP coverage requires Xdebug or PCOV — see [`apps/server/README.md`](apps/server/README.md#coverage).
 
-**Total: 168 automated tests + end-to-end browser verification against the live backend.**
+**Total: 172 automated tests + Playwright E2E that drives the SPA against a real Symfony backend.**
 
 ---
 
@@ -197,6 +197,10 @@ pnpm --filter mobile test
 # All JS coverages at once (via turbo)
 pnpm coverage
 
+# Web E2E (Playwright Chromium — starts vite + symfony before running)
+pnpm e2e:install                       # one-time: downloads Chromium (~112 MB)
+pnpm e2e                               # 4 tests in ~5 seconds
+
 # Type-checks
 pnpm --filter web check-types
 pnpm --filter mobile exec tsc --noEmit
@@ -205,9 +209,14 @@ pnpm --filter mobile exec tsc --noEmit
 pnpm --filter web build                # ~316 KB JS / 97 KB gzip
 ```
 
-End-to-end verification of the full upload flow against a running server
-is documented as `apps/server/scripts/smoke-test.ps1` (PowerShell) and
-was exercised manually in the browser against the live backend.
+The Playwright suite (`apps/web/e2e/`) starts both the Vite dev server and a
+PHP built-in server against `apps/server/public` before any test runs, then
+drives the full upload flow in Chromium: happy upload, error categorization
+on a text-bytes-declared-as-image rejection, deduplication on
+identical-payload re-upload, and the Remove action. See [ADR-014](docs/decisions.md#adr-014-playwright-e2e-against-the-real-backend).
+
+A complementary PowerShell smoke test that exercises the backend directly
+lives at `apps/server/scripts/smoke-test.ps1`.
 
 ---
 
@@ -256,7 +265,7 @@ optional early-dedup path.
 | `POST` | `/api/uploads/{id}/finalize` | reassemble, verify MD5, dedup, commit |
 | `GET`  | `/api/uploads/{id}/status` | resume / poll |
 
-All require `X-User-Id` header. Rate-limited 60 requests/minute per user.
+All require `X-User-Id` header. Rate-limited 10 inits/minute and 600 chunks/minute per user.
 Full request/response shapes, error codes, and the cleanup CLI in
 [`docs/api.md`](docs/api.md).
 
@@ -270,23 +279,27 @@ deliberately deferred. Reasoning lives in [`docs/decisions.md`](docs/decisions.m
 - **Redis** for chunk-state tracking — filesystem (`var/uploads/{id}/*.part`) is sufficient at MVP scale; `ChunkStorage` is one interface away from a Redis backend
 - **Real authentication** — `X-User-Id` header is treated as authoritative; replacing the auth subscriber is a one-file change
 - **Antimalware sandbox** (ClamAV) — limited to MIME whitelist + magic-number sniffing
-- **Background uploads on mobile** — `BGTaskScheduler` (iOS) + `WorkManager` (Android) are non-trivial; the queue freezes if the app is backgrounded
+- **True byte-range resume on mobile** — current `resumePendingUploads()` re-uploads from chunk 0 and relies on MD5 dedup. ADR-013 covers the trade-off.
 - **Real-time monitoring dashboard** — would expose `/api/metrics` for Prometheus
-- **E2E tests** (Playwright / Detox) — covered by unit tests on critical paths + manual browser verification
+- **Mobile E2E** (Detox) — covered by Jest unit tests + a manual on-device pass
 - **Stress testing** — plan documented; execution out of scope
 
 ---
 
 ## Roadmap if continued
 
-- Promote the upload-history view from web to mobile (it's a Zustand
-  store with optional `persist` middleware away)
-- Persist the active queue across app restarts (AsyncStorage on mobile)
+- Promote the upload-history view from web to mobile (Zustand persist over
+  AsyncStorage is already wired for the active queue — adding the history
+  slice is a small change)
+- True byte-range resume on mobile: have `/init` accept an existing
+  `uploadId` and return populated `existingChunks`; `upload-core` already
+  honors `existingChunks`
 - Replace `X-User-Id` with JWT verification in `UserIdSubscriber`
 - Add a `RedisChunkStorage` and make the backend swap between filesystem
   and Redis via env config
-- E2E suite (Playwright for web, Detox for mobile)
-- CI: GitHub Actions matrix running PHPUnit + the two Vitest suites + mobile type-check on every PR
+- Mobile Detox E2E to mirror the web Playwright pass
+- CI: GitHub Actions matrix running PHPUnit + the three JS test suites +
+  Playwright on every PR
 
 ---
 

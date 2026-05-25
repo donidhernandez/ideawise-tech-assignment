@@ -52,3 +52,10 @@ apps/server/.env.*.local
 apps/mobile/.expo/
 apps/mobile/node_modules/
 apps/mobile/dist/
+
+# Playwright
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/.playwright/
+apps/web/blob-report/
+apps/web/.cache/

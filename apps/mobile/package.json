@@ -54,6 +54,7 @@
     "lint": "expo lint",
     "test": "jest",
     "test:watch": "jest --watch",
+    "coverage": "jest --coverage",
     "check-types": "tsc --noEmit"
   }
 }

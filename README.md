@@ -12,14 +12,16 @@ branch.
 
 ## At a glance
 
-| Tier | Stack | Branch | Tests |
-|---|---|---|---|
-| Backend | PHP 8.5 · Symfony 6.4 LTS · Doctrine · SQLite | `feature/backend` | 22 PHPUnit, 51 assertions |
-| Web | React 19 · Vite 8 · React Compiler · Tailwind v4 · Zustand · TS strict | `feature/web` | 14 Vitest |
-| Mobile | Expo SDK 56 · RN 0.85 · expo-router (typed routes) · React Compiler | `feature/mobile` | TypeScript check |
-| Shared client | TypeScript (no runtime deps) · streaming MD5 · semaphore · backoff | `main` (`packages/upload-core`) | 22 Vitest |
+| Tier | Stack | Branch | Tests | Coverage* |
+|---|---|---|---|---|
+| Backend | PHP 8.5 · Symfony 6.4 LTS · Doctrine · SQLite | `feature/backend` | 23 PHPUnit, 54 assertions | requires xdebug/pcov |
+| Web | React 19 · Vite 8 · React Compiler · Tailwind v4 · Zustand · TS strict | `feature/web` | 48 Vitest | **84 / 65 / 97 / 98** |
+| Mobile | Expo SDK 56 · RN 0.85 · expo-router (typed routes) · React Compiler · Jest | `feature/mobile` | 36 Jest | **95 / 96 / 96 / 94** |
+| Shared client | TypeScript (no runtime deps) · streaming MD5 · semaphore · backoff | `main` (`packages/upload-core`) | 61 Vitest | **92 / 79 / 97 / 94** |
 
-**Total: 58 automated tests + end-to-end browser verification against the live backend.**
+\* Coverage cells are `% stmt / % branch / % func / % line`. Run `pnpm coverage` at the repo root for a fresh report. PHP coverage requires Xdebug or PCOV — see [`apps/server/README.md`](apps/server/README.md#coverage).
+
+**Total: 168 automated tests + end-to-end browser verification against the live backend.**
 
 ---
 
@@ -178,15 +180,22 @@ pnpm --filter mobile start
 ```bash
 # Backend (PHPUnit)
 cd apps/server && php bin/phpunit --testdox
-# → OK (22 tests, 51 assertions)
+# → OK (23 tests, 54 assertions)
 
 # Shared upload client (Vitest)
 pnpm --filter @repo/upload-core test
-# → 22 tests in 4 files
+# → 61 tests in 6 files
 
 # Web (Vitest + Testing Library)
 pnpm --filter web test
-# → 14 tests in 3 files
+# → 48 tests in 10 files
+
+# Mobile (Jest + jest-expo)
+pnpm --filter mobile test
+# → 36 tests in 4 files
+
+# All JS coverages at once (via turbo)
+pnpm coverage
 
 # Type-checks
 pnpm --filter web check-types

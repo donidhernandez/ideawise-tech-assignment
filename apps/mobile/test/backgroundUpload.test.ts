@@ -28,8 +28,16 @@ jest.mock('@/lib/expoFileSource', () => ({
 }));
 
 // SUT after mocks are registered.
-import { resumePendingUploads } from '@/lib/backgroundUpload';
+import {
+  BACKGROUND_UPLOAD_TASK,
+  defineBackgroundUploadTask,
+  registerBackgroundUploadTask,
+  resumePendingUploads,
+} from '@/lib/backgroundUpload';
+import * as BackgroundTask from 'expo-background-task';
+import * as TaskManager from 'expo-task-manager';
 import { useUploadStore, type UploadItem } from '@/store/uploadStore';
+import type { UploadEvent } from '@repo/upload-core';
 
 function makeHandle(): UploadHandle {
   return {
@@ -135,5 +143,127 @@ describe('resumePendingUploads', () => {
     const item = useUploadStore.getState().items.find((i) => i.localId === 'a');
     expect(item?.status).toBe('failed');
     expect(item?.errorCategory).toBe('network');
+  });
+
+  describe('resumed-item event bridging', () => {
+    let listener: ((event: UploadEvent) => void) | null = null;
+
+    beforeEach(() => {
+      listener = null;
+      mockUploadSpy.mockImplementation(() => ({
+        uploadId: 'srv-1',
+        status: 'idle',
+        pause: jest.fn(),
+        resume: jest.fn(),
+        cancel: jest.fn(),
+        on: jest.fn().mockImplementation((cb: (e: UploadEvent) => void) => {
+          listener = cb;
+          return () => {};
+        }),
+        done: jest.fn(),
+      }));
+    });
+
+    it('propagates statusChange events into the store row', async () => {
+      useUploadStore.getState().items = [makeItem({ localId: 'a' })];
+      await resumePendingUploads();
+      listener?.({ type: 'statusChange', status: 'uploading' });
+      const row = useUploadStore.getState().items.find((i) => i.localId === 'a');
+      expect(row?.status).toBe('uploading');
+      expect(row?.uploadId).toBe('srv-1');
+    });
+
+    it('propagates progress events', async () => {
+      useUploadStore.getState().items = [makeItem({ localId: 'a' })];
+      await resumePendingUploads();
+      listener?.({
+        type: 'progress',
+        progress: { uploadedBytes: 1500, totalBytes: 2000, uploadedChunks: 1, totalChunks: 2, ratio: 0.75 },
+      });
+      const row = useUploadStore.getState().items.find((i) => i.localId === 'a');
+      expect(row?.uploadedBytes).toBe(1500);
+      expect(row?.ratio).toBe(0.75);
+    });
+
+    it('propagates complete events with dedup flag', async () => {
+      useUploadStore.getState().items = [makeItem({ localId: 'a' })];
+      await resumePendingUploads();
+      listener?.({
+        type: 'complete',
+        result: { fileId: 'f1', url: '/u/f1', deduplicated: true },
+      });
+      const row = useUploadStore.getState().items.find((i) => i.localId === 'a');
+      expect(row?.status).toBe('complete');
+      expect(row?.ratio).toBe(1);
+      expect(row?.url).toBe('/u/f1');
+      expect(row?.deduplicated).toBe(true);
+    });
+
+    it('maps error events through categorizeError', async () => {
+      useUploadStore.getState().items = [makeItem({ localId: 'a' })];
+      await resumePendingUploads();
+      listener?.({ type: 'error', error: new Error('TypeError: Network request failed') });
+      const row = useUploadStore.getState().items.find((i) => i.localId === 'a');
+      expect(row?.status).toBe('failed');
+      expect(row?.errorCategory).toBe('network');
+    });
+  });
+});
+
+describe('defineBackgroundUploadTask', () => {
+  beforeEach(() => {
+    (TaskManager.isTaskDefined as jest.Mock).mockReturnValue(false);
+    (TaskManager.defineTask as jest.Mock).mockClear();
+  });
+
+  it('registers the task with TaskManager exactly once', () => {
+    defineBackgroundUploadTask();
+    expect(TaskManager.defineTask).toHaveBeenCalledWith(
+      BACKGROUND_UPLOAD_TASK,
+      expect.any(Function)
+    );
+  });
+
+  it('is idempotent — does not redefine when already present', () => {
+    (TaskManager.isTaskDefined as jest.Mock).mockReturnValue(true);
+    defineBackgroundUploadTask();
+    expect(TaskManager.defineTask).not.toHaveBeenCalled();
+  });
+});
+
+describe('registerBackgroundUploadTask', () => {
+  beforeEach(() => {
+    (BackgroundTask.getStatusAsync as jest.Mock).mockResolvedValue(
+      BackgroundTask.BackgroundTaskStatus.Available
+    );
+    (TaskManager.isTaskRegisteredAsync as jest.Mock).mockResolvedValue(false);
+    (BackgroundTask.registerTaskAsync as jest.Mock).mockClear();
+  });
+
+  it('registers with a 15-minute minimum interval when not yet registered', async () => {
+    await registerBackgroundUploadTask();
+    expect(BackgroundTask.registerTaskAsync).toHaveBeenCalledWith(
+      BACKGROUND_UPLOAD_TASK,
+      expect.objectContaining({ minimumInterval: 15 })
+    );
+  });
+
+  it('skips re-registration when already registered', async () => {
+    (TaskManager.isTaskRegisteredAsync as jest.Mock).mockResolvedValue(true);
+    await registerBackgroundUploadTask();
+    expect(BackgroundTask.registerTaskAsync).not.toHaveBeenCalled();
+  });
+
+  it('no-ops when the device reports background tasks are restricted', async () => {
+    (BackgroundTask.getStatusAsync as jest.Mock).mockResolvedValue(
+      BackgroundTask.BackgroundTaskStatus.Restricted
+    );
+    await registerBackgroundUploadTask();
+    expect(BackgroundTask.registerTaskAsync).not.toHaveBeenCalled();
+  });
+
+  it('swallows errors so callers do not need a try/catch', async () => {
+    (BackgroundTask.getStatusAsync as jest.Mock).mockRejectedValue(new Error('boom'));
+    await expect(registerBackgroundUploadTask()).resolves.toBeUndefined();
   });
 });

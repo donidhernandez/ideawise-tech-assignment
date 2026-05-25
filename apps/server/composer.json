@@ -62,7 +62,10 @@
         ],
         "post-update-cmd": [
             "@auto-scripts"
-        ]
+        ],
+        "test": "phpunit --testdox",
+        "coverage": "@php -d 'xdebug.mode=off' -d 'memory_limit=512M' vendor/bin/phpunit --coverage-text --coverage-html=var/coverage",
+        "coverage:phpdbg": "phpdbg -qrr vendor/bin/phpunit --coverage-text --coverage-html=var/coverage"
     },
     "conflict": {
         "symfony/symfony": "*"

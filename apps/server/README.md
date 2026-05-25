@@ -27,10 +27,32 @@ symfony serve                                 # http://localhost:8000
 php bin/phpunit --testdox
 ```
 
-Expected: **22 tests, 51 assertions, all green.**
+Expected: **23 tests, 54 assertions, all green.**
 
 The test suite drops and recreates the SQLite test database (`var/data_test.db`)
 on every run, so it is fully deterministic.
+
+### Coverage
+
+PHPUnit 13 only recognizes **Xdebug** or **PCOV** as coverage drivers
+(`phpdbg` support was removed). Install one of them, then:
+
+```bash
+composer coverage
+# or directly:
+vendor/bin/phpunit --coverage-text --coverage-html=var/coverage
+```
+
+PCOV is the lightweight option (no debug overhead, ~1s on this suite):
+
+- **Windows (chocolatey PHP):** download the matching pre-built DLL from
+  https://pecl.php.net/package/pcov, place under `C:\tools\php85\ext\`,
+  then add `extension=pcov` to `C:\tools\php85\php.ini`.
+- **macOS / Linux:** `pecl install pcov` then enable in `php.ini`.
+
+If neither is installed the script still runs but PHPUnit prints
+"No code coverage driver available" and reports nothing. The 23 tests
+themselves are unaffected.
 
 ## Routes
 

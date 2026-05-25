@@ -2,6 +2,7 @@ import type { UploadEvent, UploadHandle } from '@repo/upload-core';
 import { categorizeError } from '@repo/upload-core';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { env } from '../env.ts';
 import { fileToSource } from '../lib/fileSource.ts';
 import { getUploadManager } from '../lib/manager.ts';
 import { useUploadStore } from '../store/uploadStore.ts';
@@ -46,7 +47,11 @@ function bridgeHandleToStore(
         store.patchItem(localId, {
           uploadedBytes: event.progress.uploadedBytes,
           ratio: event.progress.ratio,
+          retryInfo: null, // chunk succeeded / upload is moving again
         });
+        break;
+      case 'chunkComplete':
+        store.patchItem(localId, { retryInfo: null });
         break;
       case 'complete':
         store.patchItem(localId, {
@@ -55,6 +60,7 @@ function bridgeHandleToStore(
           url: event.result.url,
           deduplicated: event.result.deduplicated,
           orphaned: false,
+          retryInfo: null,
         });
         store.pushHistory({
           localId,
@@ -77,13 +83,24 @@ function bridgeHandleToStore(
           error: cat.message,
           errorCategory: cat.category,
           status: 'failed',
+          retryInfo: null,
         });
         toast.error(`${fileName}: ${cat.message}`);
         break;
       }
       case 'chunkError': {
         const cat = categorizeError(event.error);
-        store.patchItem(localId, { error: cat.message, errorCategory: cat.category });
+        // Show the retry badge only while there are more attempts coming.
+        // When attempt === maxRetries the error event fires immediately after,
+        // so we skip setting retryInfo to avoid a brief flash.
+        const willRetry = event.attempt < env.maxRetries;
+        store.patchItem(localId, {
+          error: cat.message,
+          errorCategory: cat.category,
+          retryInfo: willRetry
+            ? { attempt: event.attempt + 1, total: env.maxRetries }
+            : null,
+        });
         break;
       }
     }

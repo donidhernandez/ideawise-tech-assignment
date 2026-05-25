@@ -2,6 +2,7 @@ import type { UploadEvent } from '@repo/upload-core';
 import { categorizeError } from '@repo/upload-core';
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
+import { env } from '@/lib/env';
 import { assetToSource } from '@/lib/expoFileSource';
 import { deriveName, inferMime, makeLocalId, type InferenceAsset } from '@/lib/inference';
 import { getUploadManager } from '@/lib/manager';
@@ -57,6 +58,7 @@ export function useUpload(): {
         error: null,
         errorCategory: null,
         deduplicated: false,
+        retryInfo: null,
       };
 
       addItem(initial, handle);
@@ -70,7 +72,11 @@ export function useUpload(): {
             patchItem(localId, {
               uploadedBytes: event.progress.uploadedBytes,
               ratio: event.progress.ratio,
+              retryInfo: null,
             });
+            break;
+          case 'chunkComplete':
+            patchItem(localId, { retryInfo: null });
             break;
           case 'complete':
             patchItem(localId, {
@@ -78,6 +84,7 @@ export function useUpload(): {
               ratio: 1,
               url: event.result.url,
               deduplicated: event.result.deduplicated,
+              retryInfo: null,
             });
             break;
           case 'error': {
@@ -86,6 +93,19 @@ export function useUpload(): {
               error: cat.message,
               errorCategory: cat.category,
               status: 'failed',
+              retryInfo: null,
+            });
+            break;
+          }
+          case 'chunkError': {
+            const cat = categorizeError(event.error);
+            const willRetry = event.attempt < env.maxRetries;
+            patchItem(localId, {
+              error: cat.message,
+              errorCategory: cat.category,
+              retryInfo: willRetry
+                ? { attempt: event.attempt + 1, total: env.maxRetries }
+                : null,
             });
             break;
           }

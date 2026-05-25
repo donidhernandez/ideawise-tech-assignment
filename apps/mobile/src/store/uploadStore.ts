@@ -20,6 +20,12 @@ export interface UploadItem {
   /** Coarse error bucket for the UI. */
   errorCategory: ErrorCategory | null;
   deduplicated: boolean;
+  /**
+   * Set while a chunk is waiting in the backoff delay between retry attempts.
+   * `attempt` is the next attempt number; `total` is the configured max.
+   * Null when not retrying.
+   */
+  retryInfo: { attempt: number; total: number } | null;
 }
 
 interface UploadStoreState {

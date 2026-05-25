@@ -79,6 +79,26 @@ export function UploadItem({ item }: Props) {
             />
           </div>
 
+          {item.retryInfo && (
+            <div
+              className="mt-2 flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-700 ring-1 ring-amber-200"
+              data-testid="retry-notice"
+            >
+              <svg
+                className="animate-spin shrink-0"
+                width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <span>
+                Network error — retrying chunk
+                {' '}(attempt {item.retryInfo.attempt} of {item.retryInfo.total})
+              </span>
+            </div>
+          )}
+
           {item.orphaned && item.status === 'paused' && (
             <div
               className="mt-2 flex items-start gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800 ring-1 ring-amber-200"

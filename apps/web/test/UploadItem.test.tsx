@@ -32,6 +32,7 @@ function makeItem(overrides: Partial<UploadItemModel>): UploadItemModel {
     previewUrl: null,
     deduplicated: false,
     orphaned: false,
+    retryInfo: null,
     ...overrides,
   };
 }
@@ -97,6 +98,26 @@ describe('<UploadItem /> — terminal states', () => {
     render(<UploadItem item={item} />);
     expect(screen.getByText('Invalid type')).toBeInTheDocument();
     expect(screen.getByText(/that file type is not allowed/i)).toBeInTheDocument();
+  });
+
+  it('shows the retry banner while retryInfo is set', () => {
+    const item = makeItem({
+      status: 'uploading',
+      retryInfo: { attempt: 2, total: 3 },
+    });
+    useUploadStore.getState().addItem(item, makeHandle());
+
+    render(<UploadItem item={item} />);
+    expect(screen.getByTestId('retry-notice')).toBeInTheDocument();
+    expect(screen.getByText(/attempt 2 of 3/i)).toBeInTheDocument();
+  });
+
+  it('hides the retry banner when retryInfo is null', () => {
+    const item = makeItem({ status: 'uploading', retryInfo: null });
+    useUploadStore.getState().addItem(item, makeHandle());
+
+    render(<UploadItem item={item} />);
+    expect(screen.queryByTestId('retry-notice')).toBeNull();
   });
 
   it('renders a "View uploaded file" link for complete items with a url', () => {

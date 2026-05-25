@@ -32,6 +32,7 @@ function makeItem(overrides: Partial<UploadItem>): UploadItem {
     previewUrl: null,
     deduplicated: false,
     orphaned: false,
+    retryInfo: null,
     ...overrides,
   };
 }

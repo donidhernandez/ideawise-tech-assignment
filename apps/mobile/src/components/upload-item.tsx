@@ -1,6 +1,6 @@
 import type { ErrorCategory } from '@repo/upload-core';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -88,6 +88,15 @@ export function UploadItemCard({ item }: Props) {
               ]}
             />
           </View>
+
+          {item.retryInfo && (
+            <View style={styles.retryBox}>
+              <ActivityIndicator size="small" color="#d97706" />
+              <ThemedText type="small" style={styles.retryText}>
+                Network error — retrying (attempt {item.retryInfo.attempt} of {item.retryInfo.total})
+              </ThemedText>
+            </View>
+          )}
 
           {item.error && item.status === 'failed' && (
             <View style={styles.errorBox}>
@@ -183,6 +192,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', borderRadius: 3 },
+  retryBox: {
+    marginTop: Spacing.one,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.one,
+    borderRadius: Spacing.one,
+    backgroundColor: 'rgba(251, 191, 36, 0.15)',
+  },
+  retryText: { color: '#b45309', flex: 1 },
   errorBox: {
     marginTop: Spacing.one,
     paddingHorizontal: Spacing.two,

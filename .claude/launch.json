@@ -17,6 +17,12 @@
         "C:\\Users\\Usuario\\Documents\\development\\ideawise-tech-assignment-backend\\apps\\server\\public"
       ],
       "port": 8000
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "mobile", "web"],
+      "port": 8081
     }
   ]
 }

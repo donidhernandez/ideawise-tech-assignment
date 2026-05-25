@@ -1,10 +1,12 @@
 framework:
     rate_limiter:
         # Limits new upload sessions — protects against abuse of /init.
-        # Per spec: "Upload rate limiting (10 requests/minute)".
+        # Per spec: "Upload rate limiting (10 requests/minute)". Overridable
+        # via env (RATE_LIMIT_INIT, RATE_LIMIT_CHUNK) so the E2E suite can
+        # raise the ceiling without changing application behavior in dev/prod.
         api_upload_init:
             policy: 'sliding_window'
-            limit: 10
+            limit: '%env(int:RATE_LIMIT_INIT)%'
             interval: '1 minute'
 
         # Chunk PUTs are sub-requests of an in-flight upload session, so we
@@ -14,5 +16,5 @@ framework:
         # legitimate chunked traffic.
         api_upload_chunk:
             policy: 'sliding_window'
-            limit: 600
+            limit: '%env(int:RATE_LIMIT_CHUNK)%'
             interval: '1 minute'

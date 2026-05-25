@@ -37,6 +37,11 @@ export interface UploadItem {
    * `attempt` is the next attempt number; `total` is the max configured.
    */
   retryInfo: { attempt: number; total: number } | null;
+  /**
+   * Current transfer speed in bytes/second, sampled from consecutive progress
+   * events. Null before the first sample or after the upload stops.
+   */
+  speedBps: number | null;
 }
 
 /** Pruned shape kept in localStorage for the history panel. */

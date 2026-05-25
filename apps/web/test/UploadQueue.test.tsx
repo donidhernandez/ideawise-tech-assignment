@@ -33,6 +33,7 @@ function makeItem(overrides: Partial<UploadItem>): UploadItem {
     deduplicated: false,
     orphaned: false,
     retryInfo: null,
+    speedBps: null,
     ...overrides,
   };
 }

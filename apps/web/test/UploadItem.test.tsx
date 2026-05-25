@@ -33,6 +33,7 @@ function makeItem(overrides: Partial<UploadItemModel>): UploadItemModel {
     deduplicated: false,
     orphaned: false,
     retryInfo: null,
+    speedBps: null,
     ...overrides,
   };
 }
@@ -126,7 +127,7 @@ describe('<UploadItem /> — terminal states', () => {
     useUploadStore.getState().addItem(item, makeHandle());
 
     render(<UploadItem item={item} />);
-    const link = screen.getByText(/view uploaded file/i).closest('a');
+    const link = screen.getByText(/view file/i).closest('a');
     expect(link).not.toBeNull();
     expect(link?.getAttribute('href')).toBe('http://localhost:8000/uploads/a.jpg');
   });

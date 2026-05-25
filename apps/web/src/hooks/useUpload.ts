@@ -35,6 +35,10 @@ function bridgeHandleToStore(
 ): void {
   const store = useUploadStore.getState();
 
+  // Per-upload state for speed sampling (closure — not persisted).
+  let speedLastMs = 0;
+  let speedLastBytes = 0;
+
   handle.on((event: UploadEvent) => {
     switch (event.type) {
       case 'statusChange':
@@ -42,14 +46,31 @@ function bridgeHandleToStore(
           status: event.status,
           uploadId: handle.uploadId,
         });
+        // Reset speed sampling on any status change (pause/resume etc.)
+        speedLastMs = 0;
+        speedLastBytes = 0;
         break;
-      case 'progress':
+      case 'progress': {
+        const now = Date.now();
+        const dt = now - speedLastMs;           // ms since last sample
+        const db = event.progress.uploadedBytes - speedLastBytes; // bytes since last sample
+        // Require a gap of at least 150 ms and fresh sample (< 8 s) to avoid
+        // wildly inaccurate readings right after a pause/retry.
+        const speedBps =
+          speedLastMs > 0 && dt >= 150 && dt < 8_000 && db >= 0
+            ? Math.round((db / dt) * 1000)
+            : null;
+        speedLastMs = now;
+        speedLastBytes = event.progress.uploadedBytes;
+
         store.patchItem(localId, {
           uploadedBytes: event.progress.uploadedBytes,
           ratio: event.progress.ratio,
-          retryInfo: null, // chunk succeeded / upload is moving again
+          retryInfo: null,
+          ...(speedBps !== null && { speedBps }),
         });
         break;
+      }
       case 'chunkComplete':
         store.patchItem(localId, { retryInfo: null });
         break;
@@ -61,6 +82,7 @@ function bridgeHandleToStore(
           deduplicated: event.result.deduplicated,
           orphaned: false,
           retryInfo: null,
+          speedBps: null,
         });
         store.pushHistory({
           localId,
@@ -84,6 +106,7 @@ function bridgeHandleToStore(
           errorCategory: cat.category,
           status: 'failed',
           retryInfo: null,
+          speedBps: null,
         });
         toast.error(`${fileName}: ${cat.message}`);
         break;
@@ -150,6 +173,8 @@ export function useUpload(): {
         previewUrl: buildPreview(file),
         deduplicated: false,
         orphaned: false,
+        retryInfo: null,
+        speedBps: null,
       };
 
       addItem(initial, handle);
@@ -193,6 +218,8 @@ export function useUpload(): {
         previewUrl: buildPreview(file),
         deduplicated: false,
         orphaned: false,
+        retryInfo: null,
+        speedBps: null,
       };
 
       replaceItem(localId, fresh, handle);

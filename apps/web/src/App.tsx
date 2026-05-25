@@ -1,6 +1,7 @@
 import { Toaster } from 'sonner';
 import { FilePicker } from './components/FilePicker.tsx';
 import { HistoryPanel } from './components/HistoryPanel.tsx';
+import { MonitoringPanel } from './components/MonitoringPanel.tsx';
 import { UploadQueue } from './components/UploadQueue.tsx';
 import { useUpload } from './hooks/useUpload.ts';
 import { useUploadStore } from './store/uploadStore.ts';
@@ -63,6 +64,7 @@ function App() {
           </div>
           <aside className="space-y-6">
             <HistoryPanel />
+            <MonitoringPanel />
           </aside>
         </div>
       </main>

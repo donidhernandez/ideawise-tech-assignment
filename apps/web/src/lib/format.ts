@@ -7,6 +7,21 @@ export function formatBytes(bytes: number, decimals = 1): string {
   return `${value.toFixed(i === 0 ? 0 : decimals)} ${UNITS[i]}`;
 }
 
+/**
+ * Converts a duration in seconds to a compact human-readable string.
+ * e.g. 4 → "4s", 75 → "1m 15s", 3700 → "1h 1m"
+ */
+export function formatEta(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  return remM > 0 ? `${h}h ${remM}m` : `${h}h`;
+}
+
 export function formatRelativeTime(epochMs: number, now: number = Date.now()): string {
   const diff = Math.max(0, now - epochMs);
   const secs = Math.floor(diff / 1000);

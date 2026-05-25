@@ -30,6 +30,7 @@ function makeItem(localId: string): UploadItem {
     errorCategory: null,
     previewUrl: null,
     deduplicated: false,
+    orphaned: false,
   };
 }
 

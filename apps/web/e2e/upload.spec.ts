@@ -30,11 +30,12 @@ test.describe('Media uploader — E2E', () => {
     await expect(row).toContainText('happy.jpg');
     await expect(row.getByText('Complete')).toBeVisible({ timeout: 15_000 });
 
-    // The "View uploaded file" link should expose the server URL.
-    const link = row.getByRole('link', { name: /view uploaded file/i });
+    // The "View file" link should expose the server URL. The component
+    // prepends env.apiUrl so the href is absolute (e.g. http://localhost:8000/uploads/…).
+    const link = row.getByRole('link', { name: /view file/i });
     await expect(link).toBeVisible();
     const href = await link.getAttribute('href');
-    expect(href).toMatch(/^\/uploads\/[^/]+\/\d{4}\/\d{2}\/\d{2}\/[a-f0-9]{32}_happy\.jpg$/);
+    expect(href).toMatch(/\/uploads\/[^/]+\/\d{4}\/\d{2}\/\d{2}\/[a-f0-9]{32}_happy\.jpg$/);
 
     // History panel picks the entry up (newest first).
     await expect(page.getByRole('heading', { name: /history/i })).toBeVisible();

@@ -28,6 +28,7 @@ function makeItem(localId: string, overrides: Partial<UploadItem> = {}): UploadI
     error: null,
     errorCategory: null,
     deduplicated: false,
+    retryInfo: null,
     ...overrides,
   };
 }

@@ -69,4 +69,71 @@ class UploadRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    public function countByStatus(string $status): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u)')
+            ->andWhere('u.status = :status')
+            ->setParameter('status', $status)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countCompletedSince(\DateTimeImmutable $since): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u)')
+            ->andWhere('u.status = :status')
+            ->andWhere('u.finalizedAt >= :since')
+            ->setParameter('status', Upload::STATUS_COMPLETE)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function countFailedSince(\DateTimeImmutable $since): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u)')
+            ->andWhere('u.status = :status')
+            ->andWhere('u.createdAt >= :since')
+            ->setParameter('status', Upload::STATUS_FAILED)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function sumStorageBytes(): string
+    {
+        $result = $this->createQueryBuilder('u')
+            ->select('SUM(u.size)')
+            ->andWhere('u.status = :status')
+            ->setParameter('status', Upload::STATUS_COMPLETE)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $result === null ? '0' : (string) $result;
+    }
+
+    /**
+     * @return Upload[]
+     */
+    public function findRecent(int $limit, int $offset = 0): array
+    {
+        return $this->createQueryBuilder('u')
+            ->orderBy('u.createdAt', 'DESC')
+            ->setMaxResults($limit)
+            ->setFirstResult($offset)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function countAll(): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u)')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

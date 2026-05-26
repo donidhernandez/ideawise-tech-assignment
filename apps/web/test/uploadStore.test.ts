@@ -31,6 +31,8 @@ function makeItem(localId: string): UploadItem {
     previewUrl: null,
     deduplicated: false,
     orphaned: false,
+    retryInfo: null,
+    speedBps: null,
   };
 }
 

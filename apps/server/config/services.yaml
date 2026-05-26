@@ -45,6 +45,11 @@ services:
         arguments:
             $storageDir: '%app.storage_dir%'
 
+    App\Controller\Api\Admin\AdminStatsController:
+        arguments:
+            $storageDir: '%app.storage_dir%'
+        tags: ['controller.service_arguments']
+
     # Predis client. Only instantiated lazily when CHUNK_STATE_BACKEND=redis;
     # the constructor accepts a DSN string so this works against a local
     # redis://localhost:6379 or any production cluster URL.

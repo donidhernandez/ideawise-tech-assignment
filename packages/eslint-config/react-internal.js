@@ -7,9 +7,10 @@ import globals from "globals";
 import { config as baseConfig } from "./base.js";
 
 /**
- * A custom ESLint configuration for libraries that use React.
+ * A shared ESLint configuration for React apps and libraries (browser).
  *
- * @type {import("eslint").Linter.Config[]} */
+ * @type {import("eslint").Linter.Config[]}
+ */
 export const config = [
   ...baseConfig,
   js.configs.recommended,
@@ -25,15 +26,15 @@ export const config = [
       },
     },
   },
+  // react-hooks v5: recommended-latest is the flat-config-ready object
+  pluginReactHooks.configs['recommended-latest'],
   {
-    plugins: {
-      "react-hooks": pluginReactHooks,
-    },
     settings: { react: { version: "detect" } },
     rules: {
-      ...pluginReactHooks.configs.recommended.rules,
-      // React scope no longer necessary with new JSX transform.
+      // React scope no longer required with the new JSX transform.
       "react/react-in-jsx-scope": "off",
+      // Covered by TypeScript — no runtime value for prop-types.
+      "react/prop-types": "off",
     },
   },
 ];
